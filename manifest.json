@@ -1,0 +1,12 @@
+{
+    "manifest_version": 3,
+    "name": "Snake Game",
+    "version": "1.0",
+    "description": "A simple snake game.",
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "icons": {
+        "128": "icons/icon128.png"
+    }
+}
