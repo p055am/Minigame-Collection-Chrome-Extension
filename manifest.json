@@ -1,10 +1,10 @@
 {
     "manifest_version": 3,
-    "name": "Snake Game",
+    "name": "Minigame Collection",
     "version": "1.0",
-    "description": "A simple snake game.",
+    "description": "A collection of minigames.",
     "action": {
-        "default_popup": "popup.html"
+        "default_popup": "menu/menu.html"
     },
     "icons": {
         "128": "icons/icon128.png"
