@@ -1,0 +1,191 @@
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const rows = 4;
+const columns = 4;
+
+const tileHeight = canvas.height / rows;
+const tileWidth = canvas.width / columns;
+
+
+// Grid is initialised with 0s, gameOver is initially false
+let grid = Array(rows).fill().map(() => Array(columns).fill(0));
+let gameOver = false;
+
+/**
+ * Moves the tile at the given coordinates in the given direction until
+ * it hits the edge, hits another tile, or merges with another tile.
+ * @param {number} tileX X coordinate of the tile being moved. Should be an integer
+ * @param {number} tileY Y coordinate of the tile being moved. Should be an integer
+ * @param {number} directionX The number of tiles right the tile is being moved. Should be -1, 0, or 1
+ * @param {number} directionY The number of tiles left the tile is being moved. Should be -1, 0, or 1
+ */
+function moveTile(tileX, tileY, directionX, directionY) {
+    const currentTile = grid[tileY][tileX];
+    if (currentTile == 0) {
+        // Tile is empty, don't do anything
+        return;
+    }
+    const nextX = tileX + directionX;
+    const nextY = tileY + directionY;
+
+    if (nextX < 0 || nextY < 0 || nextX >= columns || nextY >= rows) {
+        // We have reached an edge, don't do anything
+        return;
+    }
+    const nextTile = grid[nextY][nextX];
+    if (nextTile == 0) {
+        // Can move to next tile, empty current tile, and recurse
+        grid[nextY][nextX] = currentTile;
+        grid[tileY][tileX] = 0;
+        moveTile(nextX, nextY, directionX, directionY);
+    } else if (nextTile == currentTile) {
+        // Can empty current tile and merge with the next
+        grid[nextY][nextX] = nextTile + currentTile;
+        grid[tileY][tileX] = 0;
+        return;
+    } else {
+        // Next tile is unpassable, do nothing.
+        return;
+    }
+}
+
+
+function moveUp() {
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+            // Left to right, top to bottom
+            moveTile(x, y, 0, -1)
+        }
+    }
+}
+
+function moveDown() {
+    for (let y = rows - 1; y >= 0; y--) {
+        for (let x = 0; x < columns; x++) {
+            // Left to right, bottom to top
+            moveTile(x, y, 0, 1)
+        }
+    }
+}
+
+function moveLeft() {
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+            // Left to right, top to bottom
+            moveTile(x, y, -1, 0)
+        }
+    }
+}
+
+function moveRight() {
+    for (let y = 0; y < rows; y++) {
+        for (let x = columns - 1; x >= 0; x--) {
+            // Right to left, top to bottom
+            moveTile(x, y, 1, 0)
+        }
+    }
+}
+
+function createNextTile() {
+    let emptyTiles = getEmptyTiles();
+    if (emptyTiles.length == 0) {
+        gameOver = true;
+    } else {
+        // Selects a random new Tile from the list of all empty tiles
+        let newTileCoordinates = emptyTiles[Math.floor(Math.random() * emptyTiles.length)];
+        let newX = newTileCoordinates[0];
+        let newY = newTileCoordinates[1];
+        // 1/10 for a 4, 9/10 for a 2.
+        let newTile = 2;
+        if (Math.random() > 0.9) {
+            newTile = 4;
+        }
+        grid[newY][newX] = newTile;
+    }
+}
+
+function getEmptyTiles() {
+    let emptyTiles = [];
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+            if (grid[y][x] == 0) {
+                emptyTiles.push([x, y]);
+            }
+        }
+    }
+    return emptyTiles;
+}
+
+document.addEventListener("keydown", e => {
+
+    if (e.key === "ArrowUp") {
+        moveUp();
+        createNextTile();
+        draw();
+    }
+
+    if (e.key === "ArrowDown") {
+        moveDown();
+        createNextTile();
+        draw();
+    }
+
+    if (e.key === "ArrowLeft") {
+        moveLeft();
+        createNextTile();
+        draw();
+    }
+
+    if (e.key === "ArrowRight") {
+        moveRight();
+        createNextTile();
+        draw();
+    }
+});
+
+function draw() {
+    ctx.fillStyle = "aquamarine";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    function draw_tile(tileColour, textColour, text, x, y) {
+        // Draws the tile background
+        ctx.fillStyle = tileColour;
+        ctx.fillRect(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
+
+        // Draws the text
+        ctx.fillStyle = textColour;
+        ctx.textAlign = "center";
+        ctx.fillText(text, ((x + 0.5) * tileWidth), ((y + 0.5) * tileHeight));
+        // + 0.5 puts the text in the tile center
+    }
+
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+            let tile = grid[y][x]
+            if (tile == 0) {
+                continue;
+            }
+            let tileColour;
+            let textColour;
+            if (tile <= 2) {
+                tileColour = "white";
+                textColour = "black";
+            } else if (tile <= 8) {
+                tileColour = "antiqueWhite";
+                textColour = "black";
+            } else if (tile <= 64) {
+                tileColour = "red";
+                textColour = "white";
+            } else if (tile <= 1024) {
+                tileColour = "gold";
+                textColour = "white";
+            } else {
+                tileColour = "black";
+                textColour = "white";
+            }
+            draw_tile(tileColour, textColour, tile, x, y);
+        }
+    }
+}
