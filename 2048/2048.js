@@ -169,9 +169,10 @@ function draw() {
 
         // Draws the text
         ctx.fillStyle = colourScheme.textColour;
-        ctx.textAlign = "center";
-        ctx.fillText(text, ((x + 0.5) * tileWidth), ((y + 0.5) * tileHeight));
-        // + 0.5 puts the text in the tile center
+        ctx.textAlign = "center"; // Horizontally center
+        ctx.textBaseline = 'middle'; // Vertically center
+        ctx.font = "30px Arial"; // TODO make the font size adjust to the tile size (Needed for larger numbers)
+        ctx.fillText(text, ((x + 0.5) * tileWidth), ((y + 0.5) * tileHeight)); // + 0.5 puts the text in the tile center
     }
 
     for (let y = 0; y < rows; y++) {
