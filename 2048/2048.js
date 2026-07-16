@@ -11,6 +11,7 @@ const tileWidth = canvas.width / columns;
 // Grid is initialised with 0s, gameOver is initially false
 let grid = Array(rows).fill().map(() => Array(columns).fill(0));
 let gameOver = false;
+draw()
 
 /**
  * Moves the tile at the given coordinates in the given direction until
@@ -144,18 +145,30 @@ document.addEventListener("keydown", e => {
     }
 });
 
+class TileColourScheme {
+    constructor(tileColour, textColour) {
+        this.tileColour = tileColour;
+        this.textColour = textColour;
+    }
+}
+
 function draw() {
-    ctx.fillStyle = "aquamarine";
+    ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 
-    function draw_tile(tileColour, textColour, text, x, y) {
+    function draw_tile(colourScheme, text, x, y) {
         // Draws the tile background
-        ctx.fillStyle = tileColour;
+        ctx.fillStyle = colourScheme.tileColour;
         ctx.fillRect(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
 
+        // Draws a border around the tile
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x * tileWidth, y * tileHeight, tileWidth, tileHeight)
+
         // Draws the text
-        ctx.fillStyle = textColour;
+        ctx.fillStyle = colourScheme.textColour;
         ctx.textAlign = "center";
         ctx.fillText(text, ((x + 0.5) * tileWidth), ((y + 0.5) * tileHeight));
         // + 0.5 puts the text in the tile center
@@ -167,25 +180,36 @@ function draw() {
             if (tile == 0) {
                 continue;
             }
-            let tileColour;
-            let textColour;
-            if (tile <= 2) {
-                tileColour = "white";
-                textColour = "black";
-            } else if (tile <= 8) {
-                tileColour = "antiqueWhite";
-                textColour = "black";
-            } else if (tile <= 64) {
-                tileColour = "red";
-                textColour = "white";
-            } else if (tile <= 1024) {
-                tileColour = "gold";
-                textColour = "white";
-            } else {
-                tileColour = "black";
-                textColour = "white";
-            }
-            draw_tile(tileColour, textColour, tile, x, y);
+            let colourScheme = getTileColourScheme(tile);
+
+            draw_tile(colourScheme, tile, x, y);
         }
+    }
+}
+
+/**
+ * Returns the colour scheme for a tile based on its number
+ * @param {number} number The tile number
+ * @returns A TileColourScheme object.
+ */
+function getTileColourScheme(tile) {
+    if (tile <= 2) {
+        return new TileColourScheme("#f0ede9", "#756452");
+    } else if (tile <= 4) {
+        return new TileColourScheme("#ebd7b5", "#756452");
+    } else if (tile <= 8) {
+        return new TileColourScheme("#f2af74", "white");
+    } else if (tile <= 16) {
+        return new TileColourScheme("#f5915b", "white");
+    } else if (tile <= 32) {
+        return new TileColourScheme("#f57656", "white");
+    } else if (tile <= 64) {
+        return new TileColourScheme("#f55936", "white");
+    } else if (tile <= 256) {
+        return new TileColourScheme("#f2ce54", "white");
+    } else if (tile <= 1024) {
+        return new TileColourScheme("#ffbb00", "white");
+    } else {
+        return new TileColourScheme("black", "white");
     }
 }
