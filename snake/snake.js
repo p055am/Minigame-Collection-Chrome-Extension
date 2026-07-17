@@ -17,6 +17,17 @@ let food = {
 };
 
 let score = 0;
+let highScore = 0;
+
+chrome.storage.local.get(
+    ["snake_highScore"],
+    (result) => {
+        highScore = result.highScore || 0;
+
+        document.getElementById("high-score").textContent = highScore;
+    }
+);
+
 
 document.addEventListener("keydown", e => {
 
@@ -54,6 +65,16 @@ function update() {
 
         score++;
         document.getElementById("score").textContent = score;
+
+        if (score > highScore) {
+            highScore = score;
+
+            document.getElementById("high-score").textContent = highScore;
+
+            chrome.storage.local.set({
+                snake_highScore: highScore
+            });
+        }
 
         spawnFood();
 

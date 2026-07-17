@@ -3,6 +3,9 @@
     "name": "Minigame Collection",
     "version": "1.0",
     "description": "A collection of minigames.",
+    "permissions": [
+        "storage"
+    ],
     "action": {
         "default_popup": "menu/menu.html"
     },
