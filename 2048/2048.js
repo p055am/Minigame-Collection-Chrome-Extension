@@ -7,88 +7,138 @@ const columns = 4;
 const tileHeight = canvas.height / rows;
 const tileWidth = canvas.width / columns;
 
+class TileColourScheme {
+    constructor(tileColour, textColour) {
+        this.tileColour = tileColour;
+        this.textColour = textColour;
+    }
+}
+
 
 // Grid is initialised with 0s, gameOver is initially false
 let grid = Array(rows).fill().map(() => Array(columns).fill(0));
 let gameOver = false;
-draw()
+
 
 /**
- * Moves the tile at the given coordinates in the given direction until
- * it hits the edge, hits another tile, or merges with another tile.
- * @param {number} tileX X coordinate of the tile being moved. Should be an integer
- * @param {number} tileY Y coordinate of the tile being moved. Should be an integer
- * @param {number} directionX The number of tiles right the tile is being moved. Should be -1, 0, or 1
- * @param {number} directionY The number of tiles left the tile is being moved. Should be -1, 0, or 1
+ * Processes moving a line to the left, merging any equal and adjacent tiles.
+ * The line will be padded with 0s to ensure the result is the same length as the input.
+ * @param {number[]} line The line to be moved
+ * @param {boolean} reverse If true, processes moving the line to the right. Default false.
+ * @returns The processed line
  */
-function moveTile(tileX, tileY, directionX, directionY) {
-    const currentTile = grid[tileY][tileX];
-    if (currentTile == 0) {
-        // Tile is empty, don't do anything
-        return;
-    }
-    const nextX = tileX + directionX;
-    const nextY = tileY + directionY;
+function processLine(line, reverse = false) {
+    // Remove 0s
+    let newLine = line.filter(value => value != 0);
 
-    if (nextX < 0 || nextY < 0 || nextX >= columns || nextY >= rows) {
-        // We have reached an edge, don't do anything
-        return;
+    // To process from right to left, reverse list at start and end.
+    if (reverse) {
+        newLine.reverse();
     }
-    const nextTile = grid[nextY][nextX];
-    if (nextTile == 0) {
-        // Can move to next tile, empty current tile, and recurse
-        grid[nextY][nextX] = currentTile;
-        grid[tileY][tileX] = 0;
-        moveTile(nextX, nextY, directionX, directionY);
-    } else if (nextTile == currentTile) {
-        // Can empty current tile and merge with the next
-        grid[nextY][nextX] = nextTile + currentTile;
-        grid[tileY][tileX] = 0;
-        return;
-    } else {
-        // Next tile is unpassable, do nothing.
-        return;
+
+    let result = [];
+
+    // Merge values if they are the same as the next in line
+    for (let i = 0; i < newLine.length; i++) {
+
+        if (i < newLine.length - 1 && newLine[i] === newLine[i + 1]) {
+            result.push(newLine[i] * 2);
+            i++; // Skip the merged tile
+        } else {
+            result.push(newLine[i]);
+        }
     }
+
+    // Re-add 0s until length equals the old line length.
+    while (result.length < line.length) {
+        result.push(0);
+    }
+
+    if (reverse) {
+        result.reverse();
+    }
+
+    return result;
 }
 
 
 function moveUp() {
-    for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < columns; x++) {
-            // Left to right, top to bottom
-            moveTile(x, y, 0, -1)
+    let gridChanged = false;
+    for (let x = 0; x < columns; x++) {
+
+        // Extract each column and process it.
+        let oldColumn = [];
+        for (let y = 0; y < rows; y++) {
+            oldColumn.push(grid[y][x]);
+        }
+
+        const newColumn = processLine(oldColumn, false);
+
+        if (!oldColumn.every((val, index) => val === newColumn[index])) {
+            gridChanged = true;
+        }
+
+        for (let y = 0; y < rows; y++) {
+            grid[y][x] = newColumn[y];
         }
     }
+    return gridChanged;
 }
 
 function moveDown() {
-    for (let y = rows - 1; y >= 0; y--) {
-        for (let x = 0; x < columns; x++) {
-            // Left to right, bottom to top
-            moveTile(x, y, 0, 1)
+    let gridChanged = false;
+    for (let x = 0; x < columns; x++) {
+
+        // Extract each column and process it.
+        let oldColumn = [];
+        for (let y = 0; y < rows; y++) {
+            oldColumn.push(grid[y][x]);
+        }
+
+        const newColumn = processLine(oldColumn, true);
+
+        if (!oldColumn.every((val, index) => val === newColumn[index])) {
+            gridChanged = true;
+        }
+
+        for (let y = 0; y < rows; y++) {
+            grid[y][x] = newColumn[y];
         }
     }
+    return gridChanged;
 }
 
 function moveLeft() {
+    let gridChanged = false;
     for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < columns; x++) {
-            // Left to right, top to bottom
-            moveTile(x, y, -1, 0)
+        const oldLine = [...grid[y]]
+        const newLine = processLine(oldLine, false);
+
+        if (!oldLine.every((val, index) => val === newLine[index])) {
+            gridChanged = true;
         }
+
+        grid[y] = newLine;
     }
+    return gridChanged;
 }
 
 function moveRight() {
+    let gridChanged = false;
     for (let y = 0; y < rows; y++) {
-        for (let x = columns - 1; x >= 0; x--) {
-            // Right to left, top to bottom
-            moveTile(x, y, 1, 0)
+        const oldLine = [...grid[y]]
+        const newLine = processLine(oldLine, true);
+
+        if (!oldLine.every((val, index) => val === newLine[index])) {
+            gridChanged = true;
         }
+
+        grid[y] = newLine;
     }
+    return gridChanged;
 }
 
-function createNextTile() {
+function spawnTile() {
     let emptyTiles = getEmptyTiles();
     if (emptyTiles.length == 0) {
         gameOver = true;
@@ -121,36 +171,33 @@ function getEmptyTiles() {
 document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowUp") {
-        moveUp();
-        createNextTile();
+        if (moveUp()) {
+            spawnTile()
+        };
         draw();
     }
 
     if (e.key === "ArrowDown") {
-        moveDown();
-        createNextTile();
+        if (moveDown()) {
+            spawnTile();
+        };
         draw();
     }
 
     if (e.key === "ArrowLeft") {
-        moveLeft();
-        createNextTile();
+        if (moveLeft()) {
+            spawnTile();
+        };
         draw();
     }
 
     if (e.key === "ArrowRight") {
-        moveRight();
-        createNextTile();
+        if (moveRight()) {
+            spawnTile();
+        };
         draw();
     }
 });
-
-class TileColourScheme {
-    constructor(tileColour, textColour) {
-        this.tileColour = tileColour;
-        this.textColour = textColour;
-    }
-}
 
 function draw() {
     ctx.fillStyle = "white";
@@ -214,3 +261,7 @@ function getTileColourScheme(tile) {
         return new TileColourScheme("black", "white");
     }
 }
+
+spawnTile();
+spawnTile();
+draw()
