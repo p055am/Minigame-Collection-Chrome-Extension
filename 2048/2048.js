@@ -1,6 +1,10 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+document.getElementById("reset-game").onclick = () => {
+    resetGame();
+};
+
 const rows = 4;
 const columns = 4;
 
@@ -16,8 +20,8 @@ class TileColourScheme {
 
 
 // Grid is initialised with 0s, gameOver is initially false
-let grid = Array(rows).fill().map(() => Array(columns).fill(0));
-let gameOver = false;
+let grid = [[0]]
+resetGame();
 
 
 /**
@@ -262,6 +266,11 @@ function getTileColourScheme(tile) {
     }
 }
 
-spawnTile();
-spawnTile();
-draw()
+
+function resetGame() {
+    gameOver = false;
+    grid = Array(rows).fill().map(() => Array(columns).fill(0));
+    spawnTile();
+    spawnTile();
+    draw()
+}
