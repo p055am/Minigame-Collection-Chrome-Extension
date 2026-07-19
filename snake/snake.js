@@ -79,6 +79,28 @@ document.addEventListener("keydown", e => {
 });
 
 /**
+ * Determines whether the snake can move from direction 'from' to direction 'to'.
+ * The snake can only move from vertical to horizontal or horizontal to vertical.
+ * If either from or to are Direction.None, returns false.
+ * @param {Direction} from The starting direction
+ * @param {Direction} to The direction attempting to be moved to
+ * @returns Whether the snake can change direction
+ */
+function canTurn(from, to) {
+    if (from == Direction.NONE || to == Direction.NONE) {
+        return false;
+    }
+
+    if (from == Direction.UP || from == Direction.DOWN) {
+        // Moving vertically, can only change to horizontal
+        return to == Direction.LEFT || to == Direction.RIGHT;
+    } else {
+        // Moving horizontally, can only change to vertical
+        return to == Direction.UP || to == Direction.DOWN;
+    }
+}
+
+/**
  * Handles a directional input (up, down, left right) by storing it to currentInput or bufferInput.
  * The buffer will be filled if currentInput is already full (i.e. an input has already been made this move)
  * Inputs can only be made if they change direction. E.g. if moving right, only up or down inputs will work.
@@ -92,35 +114,17 @@ function handleInput(input) {
 
     if (currentInput == Direction.NONE) {
         // No input recieved this turn.
-        if (currentDirection == Direction.UP || currentDirection == Direction.DOWN) {
-            // Only inputs to change direction (go left or right) should be accepted.
-            if (input == Direction.LEFT || input == Direction.RIGHT) {
-                currentInput = input;
-            }
-        } else {
-            // Direction is left or right, so must move up or down
-            if (input == Direction.UP || input == Direction.DOWN) {
-                currentInput = input;
-            }
+        if (canTurn(currentDirection, input)) {
+            currentInput = input;
         }
-    } else {
-        // An input has already been received this turn, buffer next input.
-        if (bufferInput != Direction.NONE) {
-            // buffer already full.
-            return;
-        }
+    } else if (bufferInput != Direction.NONE) {
         // The buffer should be under the same 'must change directions' rule as the current input,
         // but since the current input will change the direction, it will be checked against that.
-        if (currentInput == Direction.UP || currentInput == Direction.DOWN) {
-            if (input == Direction.LEFT || input == Direction.RIGHT) {
-                bufferInput = input;
-            }
-        } else {
-            if (input == Direction.UP || input == Direction.DOWN) {
-                bufferInput = input;
-            }
+        if (canTurn(currentInput, input)) {
+            bufferInput = input;
         }
     }
+    // If here, buffer is full
 }
 
 
