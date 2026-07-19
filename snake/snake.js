@@ -288,8 +288,9 @@ function resetGame() {
         { x: 2, y: 8 }
     ];
 
-    dx = 1;
-    dy = 0;
+    currentDirection = Direction.RIGHT;
+    currentInput = Direction.NONE;
+    bufferInput = Direction.NONE;
 
     score = 0;
 
