@@ -18,6 +18,14 @@ const GameState = {
     GAME_OVER: 2
 };
 
+const Direction = {
+    NONE: 0,
+    UP: 1,
+    RIGHT: 2,
+    DOWN: 3,
+    LEFT: 4
+};
+
 let state = GameState.READY;
 
 let snake = [
@@ -31,8 +39,10 @@ let food = {
     y: 8
 };
 
-let dx = 1;
-let dy = 0;
+
+let currentDirection = Direction.RIGHT;
+let currentInput = Direction.NONE;
+let bufferInput = Direction.NONE;
 
 let score = 0;
 let highScore = 0;
@@ -51,29 +61,111 @@ chrome.storage.local.get(
 
 document.addEventListener("keydown", e => {
 
-    if (e.key === "ArrowUp" && dy === 0) {
-        dx = 0;
-        dy = -1;
-
+    if (e.key === "ArrowUp") {
+        handleInput(Direction.UP);
     }
 
-    if (e.key === "ArrowDown" && dy === 0) {
-        dx = 0;
-        dy = 1;
+    if (e.key === "ArrowDown") {
+        handleInput(Direction.DOWN);
     }
 
-    if (e.key === "ArrowLeft" && dx === 0) {
-        dx = -1;
-        dy = 0;
+    if (e.key === "ArrowLeft") {
+        handleInput(Direction.LEFT);
     }
 
-    if (e.key === "ArrowRight" && dx === 0) {
-        dx = 1;
-        dy = 0;
+    if (e.key === "ArrowRight") {
+        handleInput(Direction.RIGHT);
     }
 });
 
+/**
+ * Handles a directional input (up, down, left right) by storing it to currentInput or bufferInput.
+ * The buffer will be filled if currentInput is already full (i.e. an input has already been made this move)
+ * Inputs can only be made if they change direction. E.g. if moving right, only up or down inputs will work.
+ * Buffered inputs occur after the current input, so can only be made if they change direction again.
+ * @param {Direction} input The input being handled
+ */
+function handleInput(input) {
+    if (input == Direction.NONE) {
+        return;
+    }
+
+    if (currentInput == Direction.NONE) {
+        // No input recieved this turn.
+        if (currentDirection == Direction.UP || currentDirection == Direction.DOWN) {
+            // Only inputs to change direction (go left or right) should be accepted.
+            if (input == Direction.LEFT || input == Direction.RIGHT) {
+                currentInput = input;
+            }
+        } else {
+            // Direction is left or right, so must move up or down
+            if (input == Direction.UP || input == Direction.DOWN) {
+                currentInput = input;
+            }
+        }
+    } else {
+        // An input has already been received this turn, buffer next input.
+        if (bufferInput != Direction.NONE) {
+            // buffer already full.
+            return;
+        }
+        // The buffer should be under the same 'must change directions' rule as the current input,
+        // but since the current input will change the direction, it will be checked against that.
+        if (currentInput == Direction.UP || currentInput == Direction.DOWN) {
+            if (input == Direction.LEFT || input == Direction.RIGHT) {
+                bufferInput = input;
+            }
+        } else {
+            if (input == Direction.UP || input == Direction.DOWN) {
+                bufferInput = input;
+            }
+        }
+    }
+}
+
+
+function processInput() {
+    if (currentInput == Direction.NONE) {
+        return;
+    }
+
+    currentDirection = currentInput;
+    if (bufferInput != Direction.NONE) {
+        currentInput = bufferInput;
+        bufferInput = Direction.NONE;
+    } else {
+        currentInput = Direction.NONE;
+    }
+}
+
+/**
+ * Gets the dx and dy for the given direction.
+ * @param {Direction} direction The direction whose velocity is being found. Defaults to currentDirection
+ * @returns The velocity of the direction, in format [dx, dy]
+ */
+function getVelocity(direction = currentDirection) {
+    let dx = 0;
+    let dy = 0;
+    if (direction == Direction.UP) {
+        dy = -1;
+    } else if (direction == Direction.DOWN) {
+        dy = 1
+    } else if (direction == Direction.LEFT) {
+        dx = -1
+    } else if (direction == Direction.RIGHT) {
+        dx = 1
+    }
+    return [dx, dy];
+}
+
 function update() {
+
+    // This will update currentDirection based on any inputs or buffered inputs.
+    processInput();
+
+    const velocity = getVelocity(currentDirection);
+    const dx = velocity[0];
+    const dy = velocity[1];
 
     const head = {
         x: snake[0].x + dx,
