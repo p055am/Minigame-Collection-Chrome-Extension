@@ -15,16 +15,10 @@ const columns = 4;
 const tileHeight = canvas.height / rows;
 const tileWidth = canvas.width / columns;
 
-class TileColourScheme {
-    constructor(tileColour, textColour) {
-        this.tileColour = tileColour;
-        this.textColour = textColour;
-    }
-}
-
 
 // Grid is initialised with 0s, gameOver is initially false
 let grid = [[0]]
+let gameOver = false;
 resetGame();
 
 
@@ -246,28 +240,38 @@ function draw() {
 /**
  * Returns the colour scheme for a tile based on its number
  * @param {number} number The tile number
- * @returns A TileColourScheme object.
+ * @returns The colour scheme in the format { tileColour, textColour }
  */
 function getTileColourScheme(tile) {
+    let tileColour = "black";
+    let textColour = "white";
     if (tile <= 2) {
-        return new TileColourScheme("#f0ede9", "#756452");
+        tileColour = "#f0ede9";
+        textColour = "#756452";
     } else if (tile <= 4) {
-        return new TileColourScheme("#ebd7b5", "#756452");
+        tileColour = "#ebd7b5";
+        textColour = "#756452";
     } else if (tile <= 8) {
-        return new TileColourScheme("#f2af74", "white");
+        tileColour = "#f2af74";
+        textColour = "white";
     } else if (tile <= 16) {
-        return new TileColourScheme("#f5915b", "white");
+        tileColour = "#f5915b";
+        textColour = "white";
     } else if (tile <= 32) {
-        return new TileColourScheme("#f57656", "white");
+        tileColour = "#f57656";
+        textColour = "white";
     } else if (tile <= 64) {
-        return new TileColourScheme("#f55936", "white");
+        tileColour = "#f55936";
+        textColour = "white";
     } else if (tile <= 256) {
-        return new TileColourScheme("#f2ce54", "white");
+        tileColour = "#f2ce54";
+        textColour = "white";
     } else if (tile <= 1024) {
-        return new TileColourScheme("#ffbb00", "white");
-    } else {
-        return new TileColourScheme("black", "white");
+        tileColour = "#ffbb00";
+        textColour = "white";
     }
+
+    return { tileColour, textColour };
 }
 
 

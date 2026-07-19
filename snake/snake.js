@@ -149,7 +149,7 @@ function processInput() {
 /**
  * Gets the dx and dy for the given direction.
  * @param {Direction} direction The direction whose velocity is being found. Defaults to currentDirection
- * @returns The velocity of the direction, in format [dx, dy]
+ * @returns The velocity of the direction, in format { dx, dy }
  */
 function getVelocity(direction = currentDirection) {
     let dx = 0;
@@ -163,7 +163,7 @@ function getVelocity(direction = currentDirection) {
     } else if (direction == Direction.RIGHT) {
         dx = 1
     }
-    return [dx, dy];
+    return { dx, dy };
 }
 
 function update() {
@@ -172,12 +172,10 @@ function update() {
     processInput();
 
     const velocity = getVelocity(currentDirection);
-    const dx = velocity[0];
-    const dy = velocity[1];
 
     const head = {
-        x: snake[0].x + dx,
-        y: snake[0].y + dy
+        x: snake[0].x + velocity.dx,
+        y: snake[0].y + velocity.dy
     };
 
     snake.unshift(head);
@@ -212,8 +210,13 @@ function update() {
 }
 
 function spawnFood(x = Math.floor(Math.random() * tileCount), y = Math.floor(Math.random() * tileCount)) {
-    food.x = x;
-    food.y = y;
+
+
+    if (!snake.some(segment => segment.x === x && segment.y === y)) {
+        food.x = x;
+        food.y = y;
+        return;
+    }
 }
 
 /**
