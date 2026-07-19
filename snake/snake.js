@@ -210,13 +210,33 @@ function update() {
 }
 
 function spawnFood(x = Math.floor(Math.random() * tileCount), y = Math.floor(Math.random() * tileCount)) {
-
-
     if (!snake.some(segment => segment.x === x && segment.y === y)) {
+        // Planned spot is not inside the snake, so place the food there.
         food.x = x;
         food.y = y;
         return;
     }
+
+    // Planned spot is inside the snake, place randomly among non-snake tiles
+    const emptyTiles = [];
+
+    for (let y = 0; y < tileCount; y++) {
+        for (let x = 0; x < tileCount; x++) {
+            if (!snake.some(segment => segment.x === x && segment.y === y)) {
+                emptyTiles.push({ x, y });
+            }
+        }
+    }
+
+    if (emptyTiles.length === 0) {
+        // TODO figure out what to do if the board is all snake
+        return;
+    }
+
+    let selectedTile = emptyTiles[Math.floor(Math.random() * emptyTiles.length)];
+
+    food.x = selectedTile.x;
+    food.y = selectedTile.y;
 }
 
 /**
