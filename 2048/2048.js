@@ -5,6 +5,10 @@ document.getElementById("reset-game").onclick = () => {
     resetGame();
 };
 
+document.getElementById("menu-button").addEventListener("click", () => {
+    window.location.href = "../menu/menu.html";
+});
+
 const rows = 4;
 const columns = 4;
 
