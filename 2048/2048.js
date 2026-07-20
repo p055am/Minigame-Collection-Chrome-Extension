@@ -22,6 +22,22 @@ let gameOver = false;
 resetGame();
 
 
+chrome.storage.local.get(
+    ["game2048_grid"],
+    (result) => {
+
+        if (result.game2048_grid) {
+            grid = result.game2048_grid;
+            draw();
+        }
+        else {
+            resetGame();
+        }
+
+    }
+);
+
+
 /**
  * Processes moving a line to the left, merging any equal and adjacent tiles.
  * The line will be padded with 0s to ensure the result is the same length as the input.
@@ -170,11 +186,18 @@ function getEmptyTiles() {
     return emptyTiles;
 }
 
+function saveGame() {
+    chrome.storage.local.set({
+        game2048_grid: grid
+    });
+}
+
 document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowUp") {
         if (moveUp()) {
             spawnTile()
+            saveGame();
         };
         draw();
     }
@@ -182,6 +205,7 @@ document.addEventListener("keydown", e => {
     if (e.key === "ArrowDown") {
         if (moveDown()) {
             spawnTile();
+            saveGame();
         };
         draw();
     }
@@ -189,6 +213,7 @@ document.addEventListener("keydown", e => {
     if (e.key === "ArrowLeft") {
         if (moveLeft()) {
             spawnTile();
+            saveGame();
         };
         draw();
     }
@@ -196,6 +221,7 @@ document.addEventListener("keydown", e => {
     if (e.key === "ArrowRight") {
         if (moveRight()) {
             spawnTile();
+            saveGame();
         };
         draw();
     }
