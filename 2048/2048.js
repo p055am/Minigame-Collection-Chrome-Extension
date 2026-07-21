@@ -5,19 +5,28 @@ document.getElementById("reset-game").onclick = () => {
     resetGame();
 };
 
+document.getElementById("undo-button").onclick = () => {
+    if (undo()) {
+        saveGame();
+    }
+    draw();
+};
+
 document.getElementById("menu-button").addEventListener("click", () => {
     window.location.href = "../menu/menu.html";
 });
 
 const rows = 4;
 const columns = 4;
+const maxUndos = 64;
 
 const tileHeight = canvas.height / rows;
 const tileWidth = canvas.width / columns;
 
 
 // Grid is initialised with 0s, gameOver is initially false
-let grid = [[0]]
+let grid = [[0]];
+let pastGrids = [];
 let gameOver = false;
 resetGame();
 
@@ -36,6 +45,10 @@ chrome.storage.local.get(
 
     }
 );
+
+function deepCopyGrid(copiedGrid = grid) {
+    return grid.map(row => [...row]);
+}
 
 
 /**
@@ -79,8 +92,25 @@ function processLine(line, reverse = false) {
     return result;
 }
 
+function undo() {
+    if (pastGrids.length == 0) {
+        return false;
+    }
+
+    grid = pastGrids.pop();
+    return true;
+}
+
+function savePastGrid(newGrid) {
+    if (pastGrids.length >= maxUndos) {
+        pastGrids.shift();
+    }
+    pastGrids.push(newGrid);
+}
+
 
 function moveUp() {
+    const gridCopy = deepCopyGrid(grid);
     let gridChanged = false;
     for (let x = 0; x < columns; x++) {
 
@@ -100,10 +130,14 @@ function moveUp() {
             grid[y][x] = newColumn[y];
         }
     }
+    if (gridChanged) {
+        savePastGrid(gridCopy);
+    }
     return gridChanged;
 }
 
 function moveDown() {
+    const gridCopy = deepCopyGrid(grid);
     let gridChanged = false;
     for (let x = 0; x < columns; x++) {
 
@@ -123,10 +157,15 @@ function moveDown() {
             grid[y][x] = newColumn[y];
         }
     }
+    if (gridChanged) {
+        savePastGrid(gridCopy);
+    }
+
     return gridChanged;
 }
 
 function moveLeft() {
+    const gridCopy = deepCopyGrid(grid);
     let gridChanged = false;
     for (let y = 0; y < rows; y++) {
         const oldLine = [...grid[y]]
@@ -138,10 +177,15 @@ function moveLeft() {
 
         grid[y] = newLine;
     }
+    if (gridChanged) {
+        savePastGrid(gridCopy);
+    }
+
     return gridChanged;
 }
 
 function moveRight() {
+    const gridCopy = deepCopyGrid(grid);
     let gridChanged = false;
     for (let y = 0; y < rows; y++) {
         const oldLine = [...grid[y]]
@@ -153,6 +197,10 @@ function moveRight() {
 
         grid[y] = newLine;
     }
+    if (gridChanged) {
+        savePastGrid(gridCopy);
+    }
+
     return gridChanged;
 }
 
