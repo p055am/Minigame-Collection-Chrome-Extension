@@ -10,6 +10,9 @@ document.getElementById("reset-game").onclick = () => {
 };
 
 document.getElementById("menu-button").addEventListener("click", () => {
+    chrome.storage.local.set({
+        active_window: "menu"
+    });
     window.location.href = "../menu/menu.html";
 });
 
