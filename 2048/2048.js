@@ -294,8 +294,30 @@ function draw() {
         ctx.fillStyle = colourScheme.textColour;
         ctx.textAlign = "center"; // Horizontally center
         ctx.textBaseline = 'middle'; // Vertically center
-        ctx.font = "30px Arial"; // TODO make the font size adjust to the tile size (Needed for larger numbers)
+        const fontSize = getFontSize(text);
+        ctx.font = `${fontSize}px Arial`;
         ctx.fillText(text, ((x + 0.5) * tileWidth), ((y + 0.5) * tileHeight)); // + 0.5 puts the text in the tile center
+    }
+
+    function getFontSize(text) {
+
+        // Maximum. Math.min is to handle anything weird with non-square tiles
+        let fontSize = Math.min(tileHeight, tileWidth) * 0.4;
+
+        while (fontSize > 10) {
+
+            ctx.font = `${fontSize}px Arial`;
+
+            const width = ctx.measureText(text).width;
+
+            if (width <= tileWidth * 0.8) {
+                return fontSize;
+            }
+
+            fontSize--;
+        }
+
+        return 10; // Minimum
     }
 
     for (let y = 0; y < rows; y++) {
