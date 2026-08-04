@@ -61,15 +61,15 @@ class MovementAnimation {
 class MergeAnimation {
     constructor(newValue, x, y) {
         this.newValue = newValue;
-        this.x = y;
+        this.x = x;
         this.y = y;
     }
 }
 
 class SpawnAnimation {
-    constructor(newValue, x, y) {
-        this.newValue = newValue;
-        this.x = y;
+    constructor(value, x, y) {
+        this.value = value;
+        this.x = x;
         this.y = y;
     }
 }
@@ -374,17 +374,35 @@ function draw() {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    /**
+     * Wrapper function for drawTile using coordinates on the grid rather than canvas
+     * I.e. top left tile is (0,0), right of that is (1,0)) bottom right on a 4x4 board is (3,3)
+     * This can be used for animations using fractions. 
+     * E.g. Halfway through a move from (0,1) to (0,0) would be (0,0.5)
+     */
+    function drawTileAtGridCoordinates(colourScheme, text, x, y, scale = 1) {
+        drawTile(colourScheme, text, x * tileWidth, y * tileWidth, scale);
+    }
 
-    function draw_tile(colourScheme, text, x, y, scale = 1) {
+
+    function drawTile(colourScheme, text, topLeftX, topLeftY, scale = 1) {
         // Draws the tile background
-        ctx.scale = scale;
+
+        const centreX = topLeftX + tileWidth / 2;
+        const centreY = topLeftY + tileHeight / 2;
+
+        ctx.save();
+
+        ctx.translate(centreX, centreY);
+        ctx.scale(scale, scale);
+
         ctx.fillStyle = colourScheme.tileColour;
-        ctx.fillRect(x, y, tileWidth, tileHeight);
+        ctx.fillRect(-tileWidth / 2, - tileHeight / 2, tileWidth, tileHeight);
 
         // Draws a border around the tile
         ctx.strokeStyle = "black";
         ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, tileWidth, tileHeight)
+        ctx.strokeRect(-tileWidth / 2, - tileHeight / 2, tileWidth, tileHeight);
 
         // Draws the text
         ctx.fillStyle = colourScheme.textColour;
@@ -392,7 +410,9 @@ function draw() {
         ctx.textBaseline = 'middle'; // Vertically center
         const fontSize = getFontSize(text);
         ctx.font = `${fontSize}px Arial`;
-        ctx.fillText(text, (x + (0.5 * tileWidth)), (y + (0.5 * tileHeight))); // + 0.5 puts the text in the tile center
+        ctx.fillText(text, 0, 0);
+
+        ctx.restore();
     }
 
     function getFontSize(text) {
@@ -416,17 +436,35 @@ function draw() {
         return 10; // Minimum
     }
 
+    function drawSpawningTiles() {
+        if (!animationController.animating) {
+            return;
+        }
+
+        // Progress will go from 0 to 1 during the spawn animation
+        const progress = Math.min(animationController.animationTimer / spawnAnimationMs, 1);
+
+        
+        for (const animation of animationController.spawnAnimations) {
+            const colourScheme = getTileColourScheme(animation.value);
+            
+            drawTileAtGridCoordinates(colourScheme, animation.value, animation.x, animation.y, progress);
+        }
+    }
+
     for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
             let tile = grid[y][x]
             if (tile.value == 0 || tile.animating) {
                 continue;
             }
-            let colourScheme = getTileColourScheme(tile.value);
+            const colourScheme = getTileColourScheme(tile.value);
 
-            draw_tile(colourScheme, tile.value, x * tileWidth, y * tileWidth);
+            drawTileAtGridCoordinates(colourScheme, tile.value, x, y);
         }
     }
+
+    drawSpawningTiles();
 }
 
 /**
