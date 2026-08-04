@@ -7,9 +7,11 @@ document.getElementById("reset-game").onclick = () => {
 
 document.getElementById("undo-button").onclick = () => {
     if (undo()) {
+        finishAnimation()
         saveGame();
+        draw();
     }
-    draw();
+
 };
 
 document.getElementById("menu-button").addEventListener("click", () => {
@@ -19,6 +21,7 @@ document.getElementById("menu-button").addEventListener("click", () => {
     window.location.href = "../menu/menu.html";
 });
 
+// Settings for the game
 const rows = 4;
 const columns = 4;
 const maxUndos = 64;
@@ -26,10 +29,64 @@ const maxUndos = 64;
 const tileHeight = canvas.height / rows;
 const tileWidth = canvas.width / columns;
 
+const movementAnimationMs = 100;
+const spawnAnimationMs = 100;
+const impactAnimationMs = 30;
+const mergeAnimationMs = 60;
+
+
+class Tile {
+    constructor(value, x, y, animating) {
+        this.value = value;
+        this.x = x;
+        this.y = y;
+        this.animating = animating;
+    }
+}
+
+class MovementAnimation {
+    constructor(value, startX, startY, endX, endY, merging) {
+        this.value = value;
+
+        this.startX = startX;
+        this.startY = startY;
+
+        this.endX = endX;
+        this.endY = endY;
+
+        this.merging = merging;
+    }
+}
+
+class MergeAnimation {
+    constructor(newValue, x, y) {
+        this.newValue = newValue;
+        this.x = y;
+        this.y = y;
+    }
+}
+
+class SpawnAnimation {
+    constructor(newValue, x, y) {
+        this.newValue = newValue;
+        this.x = y;
+        this.y = y;
+    }
+}
+
 
 // Grid is initialised with 0s, gameOver is initially false
-let grid = [[0]];
+let grid = [[new Tile(0, 0, 0, false)]];
 let pastGrids = [];
+let animationController = {
+    movementAnimations: [],
+    mergeAnimations: [],
+    spawnAnimations: [],
+    animationStartTime: performance.now(),
+    animationTimer: 0,
+    animating: false,
+}
+
 let gameOver = false;
 resetGame();
 
@@ -59,40 +116,118 @@ function deepCopyGrid(copiedGrid = grid) {
  * The line will be padded with 0s to ensure the result is the same length as the input.
  * @param {number[]} line The line to be moved
  * @param {boolean} reverse If true, processes moving the line to the right. Default false.
- * @returns The processed line
+ * @returns whether the grid changed
  */
-function processLine(line, reverse = false) {
-    // Remove 0s
-    let newLine = line.filter(value => value != 0);
 
-    // To process from right to left, reverse list at start and end.
-    if (reverse) {
-        newLine.reverse();
+
+function processLine(lineNumber, horizontal, reverse) {
+    let line = [];
+    if (horizontal) {
+        // Extract a row
+        line = grid[lineNumber];
+    } else {
+        // Extract a column
+        for (let y = 0; y < rows; y++) {
+            line.push(grid[y][lineNumber]);
+        }
     }
 
-    let result = [];
+    // Changing format to make tiles easier to track
+    let trackingLine = []
+    let nextId = 0;
+    for (let i = 0; i < line.length; i++) {
+        const currentTile = line[i];
+        trackingLine.push({ value: currentTile.value, ids: [nextId] });
+        nextId++;
+    }
+
+    // Remove 0s
+    let filteredLine = trackingLine.filter(tile => tile.value != 0);
+
+    // To process from right to left / bottom to top, reverse list at start and end.
+    if (reverse) {
+        filteredLine.reverse();
+    }
+
+    let newLine = [];
 
     // Merge values if they are the same as the next in line
-    for (let i = 0; i < newLine.length; i++) {
+    for (let i = 0; i < filteredLine.length; i++) {
 
-        if (i < newLine.length - 1 && newLine[i] === newLine[i + 1]) {
-            result.push(newLine[i] * 2);
+        if (i < filteredLine.length - 1 && filteredLine[i].value === filteredLine[i + 1].value) {
+            // Merged values store both of the ids that created them.
+            newLine.push({ value: filteredLine[i].value * 2, ids: [filteredLine[i].ids[0], filteredLine[i + 1].ids[0]] });
             i++; // Skip the merged tile
         } else {
-            result.push(newLine[i]);
+            newLine.push({ value: filteredLine[i].value, ids: filteredLine[i].ids });
         }
     }
 
     // Re-add 0s until length equals the old line length.
-    while (result.length < line.length) {
-        result.push(0);
+    while (newLine.length < line.length) {
+        newLine.push({ value: 0, ids: [] });
     }
 
     if (reverse) {
-        result.reverse();
+        newLine.reverse();
     }
 
-    return result;
+
+    // Update grid state. Any changes between old and new lines will create animations
+    let lineChanged = false;
+    for (let newIndex = 0; newIndex < newLine.length; newIndex++) {
+        const currentTile = newLine[newIndex];
+        let animate = false;
+        if (currentTile.ids.length == 1) {
+            // A non-merged, non empty tile. Check if the position has changed.
+            const oldIndex = trackingLine.findIndex(tile => tile.ids[0] === currentTile.ids[0]);
+
+            if (oldIndex != newIndex) {
+                // The tile has moved, so make an animation object
+                lineChanged = true;
+                animate = true;
+                if (horizontal) {
+                    animationController.movementAnimations.push(new MovementAnimation(
+                        currentTile.value, oldIndex, lineNumber, newIndex, lineNumber, false));
+                } else {
+                    animationController.movementAnimations.push(new MovementAnimation(
+                        currentTile.value, lineNumber, oldIndex, lineNumber, newIndex, false));
+                }
+            }
+        } else if (currentTile.ids.length == 2) {
+            // A merged tile. Make animation objects.
+            lineChanged = true;
+            animate = true;
+            const oldIndex1 = trackingLine.findIndex(tile => tile.ids[0] === currentTile.ids[0]);
+            const oldIndex2 = trackingLine.findIndex(tile => tile.ids[0] === currentTile.ids[1]);
+            // The oldIndex and newIndex might be the same for one of the tiles but it shouldn't matter
+            // since the tiles are merging anyway so there won't be an impact animation.
+            if (horizontal) {
+                animationController.movementAnimations.push(new MovementAnimation(
+                    currentTile.value / 2, oldIndex1, lineNumber, newIndex, lineNumber, true));
+                animationController.movementAnimations.push(new MovementAnimation(
+                    currentTile.value / 2, oldIndex2, lineNumber, newIndex, lineNumber, true));
+                animationController.mergeAnimations.push(new MergeAnimation(
+                    currentTile.value, newIndex, lineNumber));
+            } else {
+                animationController.movementAnimations.push(new MovementAnimation(
+                    currentTile.value / 2, lineNumber, oldIndex1, lineNumber, newIndex, true));
+                animationController.movementAnimations.push(new MovementAnimation(
+                    currentTile.value / 2, lineNumber, oldIndex2, lineNumber, newIndex, true));
+                animationController.mergeAnimations.push(new MergeAnimation(
+                    currentTile.value, lineNumber, newIndex));
+            }
+        }
+
+        // Update the grid
+        if (horizontal) {
+            grid[lineNumber][newIndex] = new Tile(currentTile.value, newIndex, lineNumber, animate);
+        } else {
+            grid[newIndex][lineNumber] = new Tile(currentTile.value, lineNumber, newIndex, animate);
+        }
+    }
+
+    return lineChanged;
 }
 
 function undo() {
@@ -111,100 +246,53 @@ function savePastGrid(newGrid) {
     pastGrids.push(newGrid);
 }
 
-
-function moveUp() {
+function moveGrid(horizontal, reverse) {
     const gridCopy = deepCopyGrid(grid);
     let gridChanged = false;
-    for (let x = 0; x < columns; x++) {
+    let iterationDimension = horizontal ? rows : columns;
+    for (let i = 0; i < iterationDimension; i++) {
 
-        // Extract each column and process it.
-        let oldColumn = [];
-        for (let y = 0; y < rows; y++) {
-            oldColumn.push(grid[y][x]);
-        }
-
-        const newColumn = processLine(oldColumn, false);
-
-        if (!oldColumn.every((val, index) => val === newColumn[index])) {
+        if (processLine(i, horizontal, reverse)) {
             gridChanged = true;
         }
-
-        for (let y = 0; y < rows; y++) {
-            grid[y][x] = newColumn[y];
-        }
     }
+
     if (gridChanged) {
         savePastGrid(gridCopy);
     }
     return gridChanged;
+}
+
+
+function moveUp() {
+    if (moveGrid(false, false)) {
+        successfulMovement();
+    }
 }
 
 function moveDown() {
-    const gridCopy = deepCopyGrid(grid);
-    let gridChanged = false;
-    for (let x = 0; x < columns; x++) {
-
-        // Extract each column and process it.
-        let oldColumn = [];
-        for (let y = 0; y < rows; y++) {
-            oldColumn.push(grid[y][x]);
-        }
-
-        const newColumn = processLine(oldColumn, true);
-
-        if (!oldColumn.every((val, index) => val === newColumn[index])) {
-            gridChanged = true;
-        }
-
-        for (let y = 0; y < rows; y++) {
-            grid[y][x] = newColumn[y];
-        }
+    if (moveGrid(false, true)) {
+        successfulMovement();
     }
-    if (gridChanged) {
-        savePastGrid(gridCopy);
-    }
-
-    return gridChanged;
 }
 
 function moveLeft() {
-    const gridCopy = deepCopyGrid(grid);
-    let gridChanged = false;
-    for (let y = 0; y < rows; y++) {
-        const oldLine = [...grid[y]]
-        const newLine = processLine(oldLine, false);
-
-        if (!oldLine.every((val, index) => val === newLine[index])) {
-            gridChanged = true;
-        }
-
-        grid[y] = newLine;
+    if (moveGrid(true, false)) {
+        successfulMovement();
     }
-    if (gridChanged) {
-        savePastGrid(gridCopy);
-    }
-
-    return gridChanged;
 }
 
 function moveRight() {
-    const gridCopy = deepCopyGrid(grid);
-    let gridChanged = false;
-    for (let y = 0; y < rows; y++) {
-        const oldLine = [...grid[y]]
-        const newLine = processLine(oldLine, true);
-
-        if (!oldLine.every((val, index) => val === newLine[index])) {
-            gridChanged = true;
-        }
-
-        grid[y] = newLine;
+    if (moveGrid(true, true)) {
+        successfulMovement();
     }
-    if (gridChanged) {
-        savePastGrid(gridCopy);
-    }
+}
 
-    return gridChanged;
+function successfulMovement() {
+    finishAnimation();
+    spawnTile();
+    saveGame();
+    beginAnimation();
 }
 
 function spawnTile() {
@@ -217,11 +305,12 @@ function spawnTile() {
         let newX = newTileCoordinates[0];
         let newY = newTileCoordinates[1];
         // 1/10 for a 4, 9/10 for a 2.
-        let newTile = 2;
+        let newValue = 2;
         if (Math.random() > 0.9) {
-            newTile = 4;
+            newValue = 4;
         }
-        grid[newY][newX] = newTile;
+        grid[newY][newX] = new Tile(newValue, newX, newY, true);
+        animationController.spawnAnimations.push(new SpawnAnimation(newValue, newX, newY));
     }
 }
 
@@ -229,7 +318,7 @@ function getEmptyTiles() {
     let emptyTiles = [];
     for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
-            if (grid[y][x] == 0) {
+            if (grid[y][x].value == 0) {
                 emptyTiles.push([x, y]);
             }
         }
@@ -247,34 +336,37 @@ document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowUp") {
         if (moveUp()) {
-            spawnTile()
-            saveGame();
+
+
+
         };
-        draw();
     }
 
     if (e.key === "ArrowDown") {
         if (moveDown()) {
+            finishAnimation();
             spawnTile();
             saveGame();
+            beginAnimation();
         };
-        draw();
     }
 
     if (e.key === "ArrowLeft") {
         if (moveLeft()) {
+            finishAnimation();
             spawnTile();
             saveGame();
+            beginAnimation();
         };
-        draw();
     }
 
     if (e.key === "ArrowRight") {
         if (moveRight()) {
+            finishAnimation();
             spawnTile();
             saveGame();
+            beginAnimation();
         };
-        draw();
     }
 });
 
@@ -283,15 +375,16 @@ function draw() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 
-    function draw_tile(colourScheme, text, x, y) {
+    function draw_tile(colourScheme, text, x, y, scale = 1) {
         // Draws the tile background
+        ctx.scale = scale;
         ctx.fillStyle = colourScheme.tileColour;
-        ctx.fillRect(x * tileWidth, y * tileHeight, tileWidth, tileHeight);
+        ctx.fillRect(x, y, tileWidth, tileHeight);
 
         // Draws a border around the tile
         ctx.strokeStyle = "black";
         ctx.lineWidth = 2;
-        ctx.strokeRect(x * tileWidth, y * tileHeight, tileWidth, tileHeight)
+        ctx.strokeRect(x, y, tileWidth, tileHeight)
 
         // Draws the text
         ctx.fillStyle = colourScheme.textColour;
@@ -299,7 +392,7 @@ function draw() {
         ctx.textBaseline = 'middle'; // Vertically center
         const fontSize = getFontSize(text);
         ctx.font = `${fontSize}px Arial`;
-        ctx.fillText(text, ((x + 0.5) * tileWidth), ((y + 0.5) * tileHeight)); // + 0.5 puts the text in the tile center
+        ctx.fillText(text, (x + (0.5 * tileWidth)), (y + (0.5 * tileHeight))); // + 0.5 puts the text in the tile center
     }
 
     function getFontSize(text) {
@@ -326,12 +419,12 @@ function draw() {
     for (let y = 0; y < rows; y++) {
         for (let x = 0; x < columns; x++) {
             let tile = grid[y][x]
-            if (tile == 0) {
+            if (tile.value == 0 || tile.animating) {
                 continue;
             }
-            let colourScheme = getTileColourScheme(tile);
+            let colourScheme = getTileColourScheme(tile.value);
 
-            draw_tile(colourScheme, tile, x, y);
+            draw_tile(colourScheme, tile.value, x * tileWidth, y * tileWidth);
         }
     }
 }
@@ -341,31 +434,31 @@ function draw() {
  * @param {number} number The tile number
  * @returns The colour scheme in the format { tileColour, textColour }
  */
-function getTileColourScheme(tile) {
+function getTileColourScheme(value) {
     let tileColour = "black";
     let textColour = "white";
-    if (tile <= 2) {
+    if (value <= 2) {
         tileColour = "#f0ede9";
         textColour = "#756452";
-    } else if (tile <= 4) {
+    } else if (value <= 4) {
         tileColour = "#ebd7b5";
         textColour = "#756452";
-    } else if (tile <= 8) {
+    } else if (value <= 8) {
         tileColour = "#f2af74";
         textColour = "white";
-    } else if (tile <= 16) {
+    } else if (value <= 16) {
         tileColour = "#f5915b";
         textColour = "white";
-    } else if (tile <= 32) {
+    } else if (value <= 32) {
         tileColour = "#f57656";
         textColour = "white";
-    } else if (tile <= 64) {
+    } else if (value <= 64) {
         tileColour = "#f55936";
         textColour = "white";
-    } else if (tile <= 256) {
+    } else if (value <= 256) {
         tileColour = "#f2ce54";
         textColour = "white";
-    } else if (tile <= 1024) {
+    } else if (value <= 1024) {
         tileColour = "#ffbb00";
         textColour = "white";
     }
@@ -376,8 +469,53 @@ function getTileColourScheme(tile) {
 
 function resetGame() {
     gameOver = false;
-    grid = Array(rows).fill().map(() => Array(columns).fill(0));
+    grid = Array.from({ length: rows }, (_, y) =>
+        Array.from({ length: columns }, (_, x) =>
+            new Tile(0, x, y, false)
+        )
+    );
     spawnTile();
     spawnTile();
-    draw()
+    beginAnimation();
+}
+
+function finishAnimation() {
+    // Removes the 'animating' tag from each tile
+    for (let x = 0; x < columns; x++) {
+        for (let y = 0; y < rows; y++) {
+            grid[y][x].animating = false;
+        }
+    }
+    // Clears all the animations from the animation controller
+    animationController.animating = false;
+    animationController.animationTimer = 0;
+    animationController.mergeAnimations = [];
+    animationController.movementAnimations = [];
+    animationController.spawnAnimations = [];
+}
+
+function beginAnimation() {
+    animationController.animating = true
+    animationController.animationStartTime = performance.now();
+    requestAnimationFrame(animationLoop);
+}
+
+function animationLoop(currentTime) {
+    animationController.animationTimer = currentTime - animationController.animationStartTime;
+    // If the animation timer is more than the longest animation, mark as finished.
+    if (animationController.animationTimer > (Math.max(spawnAnimationMs,
+        movementAnimationMs + mergeAnimationMs, movementAnimationMs + impactAnimationMs))) {
+        finishAnimation();
+    }
+    draw();
+
+    if (animationController.animating) {
+        requestAnimationFrame(animationLoop);
+    }
+}
+
+function printGrid() {
+    console.table(
+        grid.map(row => row.map(tile => tile.value))
+    );
 }
