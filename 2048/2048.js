@@ -30,7 +30,7 @@ const tileHeight = canvas.height / rows;
 const tileWidth = canvas.width / columns;
 
 const movementAnimationMs = 50;
-const spawnAnimationMs = 80;
+const spawnAnimationMs = 100;
 const impactAnimationMs = 30;
 const mergeAnimationMs = 40;
 
@@ -97,6 +97,7 @@ chrome.storage.local.get(
 
         if (result.game2048_grid) {
             grid = result.game2048_grid;
+            finishAnimation(); // Prevents a pop-in on some tiles
             draw();
         }
         else {
@@ -385,7 +386,7 @@ function draw() {
         ctx.save();
 
         ctx.translate(centreX, centreY);
-        ctx.scale(scale, scale);
+        ctx.scale(scale * 0.9, scale * 0.9); // 1.0 scale doesn't look very good with animations
 
         ctx.fillStyle = colourScheme.tileColour;
         ctx.fillRect(-tileWidth / 2, - tileHeight / 2, tileWidth, tileHeight);
@@ -435,9 +436,11 @@ function draw() {
         // Progress will go from 0 to 1 during the spawn animation
         const progress = Math.min(animationController.animationTimer / spawnAnimationMs, 1);
 
-        
+        // Function that goes to ~ 1.1 at 0.56 progress, then back down to 1 at 1 progress.
+        const scale = 1 + 2.7 * Math.pow(progress - 1, 3) + 1.7 * Math.pow(progress - 1, 2);
+
         for (const animation of animationController.spawnAnimations) {
-            drawTileAtGridCoordinates(animation.value, animation.x, animation.y, progress);
+            drawTileAtGridCoordinates(animation.value, animation.x, animation.y, scale);
         }
     }
 
@@ -451,6 +454,12 @@ function draw() {
         const progress = Math.min(animationController.animationTimer / movementAnimationMs, 1);
         
         for (const animation of animationController.movementAnimations) {
+
+            if (animationController.animationTimer > movementAnimationMs && animation.merging) {
+                // The merge animation should have started playing.
+                continue;
+            }
+
             const x = animation.startX + progress * (animation.endX - animation.startX);
             const y = animation.startY + progress * (animation.endY - animation.startY);
             drawTileAtGridCoordinates(animation.value, x, y);
