@@ -29,10 +29,10 @@ const maxUndos = 64;
 const tileHeight = canvas.height / rows;
 const tileWidth = canvas.width / columns;
 
-const movementAnimationMs = 100;
-const spawnAnimationMs = 100;
+const movementAnimationMs = 50;
+const spawnAnimationMs = 80;
 const impactAnimationMs = 30;
-const mergeAnimationMs = 60;
+const mergeAnimationMs = 40;
 
 
 class Tile {
@@ -200,6 +200,7 @@ function processLine(lineNumber, horizontal, reverse) {
             animate = true;
             const oldIndex1 = trackingLine.findIndex(tile => tile.ids[0] === currentTile.ids[0]);
             const oldIndex2 = trackingLine.findIndex(tile => tile.ids[0] === currentTile.ids[1]);
+
             // The oldIndex and newIndex might be the same for one of the tiles but it shouldn't matter
             // since the tiles are merging anyway so there won't be an impact animation.
             if (horizontal) {
@@ -265,31 +266,34 @@ function moveGrid(horizontal, reverse) {
 
 
 function moveUp() {
+    finishAnimation();
     if (moveGrid(false, false)) {
         successfulMovement();
     }
 }
 
 function moveDown() {
+    finishAnimation();
     if (moveGrid(false, true)) {
         successfulMovement();
     }
 }
 
 function moveLeft() {
+    finishAnimation();
     if (moveGrid(true, false)) {
         successfulMovement();
     }
 }
 
 function moveRight() {
+    finishAnimation();
     if (moveGrid(true, true)) {
         successfulMovement();
     }
 }
 
 function successfulMovement() {
-    finishAnimation();
     spawnTile();
     saveGame();
     beginAnimation();
@@ -335,53 +339,40 @@ function saveGame() {
 document.addEventListener("keydown", e => {
 
     if (e.key === "ArrowUp") {
-        if (moveUp()) {
-
-
-
-        };
+        moveUp();
     }
 
     if (e.key === "ArrowDown") {
-        if (moveDown()) {
-            finishAnimation();
-            spawnTile();
-            saveGame();
-            beginAnimation();
-        };
+        moveDown();
     }
 
     if (e.key === "ArrowLeft") {
-        if (moveLeft()) {
-            finishAnimation();
-            spawnTile();
-            saveGame();
-            beginAnimation();
-        };
+        moveLeft();
     }
 
     if (e.key === "ArrowRight") {
-        if (moveRight()) {
-            finishAnimation();
-            spawnTile();
-            saveGame();
-            beginAnimation();
-        };
+        moveRight();
     }
 });
 
-function draw() {
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function draw() { 
+
+    function drawBackground() {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     /**
-     * Wrapper function for drawTile using coordinates on the grid rather than canvas
+     * Wrapper function for drawTile using coordinates on the grid rather than canvas,
+     * and automatically getting the tile colour scheme.
      * I.e. top left tile is (0,0), right of that is (1,0)) bottom right on a 4x4 board is (3,3)
      * This can be used for animations using fractions. 
      * E.g. Halfway through a move from (0,1) to (0,0) would be (0,0.5)
      */
-    function drawTileAtGridCoordinates(colourScheme, text, x, y, scale = 1) {
-        drawTile(colourScheme, text, x * tileWidth, y * tileWidth, scale);
+    function drawTileAtGridCoordinates(value, tileX, tileY, scale = 1) {
+        const colourScheme = getTileColourScheme(value);
+
+        drawTile(colourScheme, value, tileX * tileWidth, tileY * tileWidth, scale);
     }
 
 
@@ -446,25 +437,45 @@ function draw() {
 
         
         for (const animation of animationController.spawnAnimations) {
-            const colourScheme = getTileColourScheme(animation.value);
-            
-            drawTileAtGridCoordinates(colourScheme, animation.value, animation.x, animation.y, progress);
+            drawTileAtGridCoordinates(animation.value, animation.x, animation.y, progress);
         }
     }
 
-    for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < columns; x++) {
-            let tile = grid[y][x]
-            if (tile.value == 0 || tile.animating) {
-                continue;
+    function drawMovingTiles() {
+        if (!animationController.animating) {
+            return;
+        }
+        
+
+        // Progress will go from 0 to 1 during the spawn animation
+        const progress = Math.min(animationController.animationTimer / movementAnimationMs, 1);
+        
+        for (const animation of animationController.movementAnimations) {
+            const x = animation.startX + progress * (animation.endX - animation.startX);
+            const y = animation.startY + progress * (animation.endY - animation.startY);
+            drawTileAtGridCoordinates(animation.value, x, y);
+        }
+    }
+
+    function drawStaticTiles() {
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < columns; x++) {
+                let tile = grid[y][x]
+                if (tile.value == 0 || tile.animating) {
+                    continue;
+                }
+                drawTileAtGridCoordinates(tile.value, x, y);
             }
-            const colourScheme = getTileColourScheme(tile.value);
-
-            drawTileAtGridCoordinates(colourScheme, tile.value, x, y);
         }
     }
 
-    drawSpawningTiles();
+    drawBackground();
+    if (animationController.animating) {
+        drawMovingTiles();
+        drawSpawningTiles();
+    }
+    drawStaticTiles();
+    
 }
 
 /**
