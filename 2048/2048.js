@@ -59,8 +59,8 @@ class MovementAnimation {
 }
 
 class MergeAnimation {
-    constructor(newValue, x, y) {
-        this.newValue = newValue;
+    constructor(value, x, y) {
+        this.value = value;
         this.x = x;
         this.y = y;
     }
@@ -457,6 +457,23 @@ function draw() {
         }
     }
 
+    function drawMergingTiles() {
+        if (!animationController.animating || animationController.animationTimer < movementAnimationMs) {
+            return;
+        }
+        
+
+        // Progress will go from 0 to 1 during the spawn animation
+        const progress = Math.min((animationController.animationTimer - movementAnimationMs) / mergeAnimationMs, 1);
+
+        // Scaler will go from 1 to 1.2 back to 1.
+        const scale = 1 + 0.2 * Math.sin(progress * Math.PI);
+        
+        for (const animation of animationController.mergeAnimations) {
+            drawTileAtGridCoordinates(animation.value, animation.x, animation.y, scale);
+        }
+    }
+
     function drawStaticTiles() {
         for (let y = 0; y < rows; y++) {
             for (let x = 0; x < columns; x++) {
@@ -473,6 +490,7 @@ function draw() {
     if (animationController.animating) {
         drawMovingTiles();
         drawSpawningTiles();
+        drawMergingTiles();
     }
     drawStaticTiles();
     
