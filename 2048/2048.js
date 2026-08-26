@@ -1,7 +1,7 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-document.getElementById("reset-game").onclick = () => {
+document.getElementById("reset-button").onclick = () => {
     resetGame();
 };
 
@@ -11,7 +11,19 @@ document.getElementById("undo-button").onclick = () => {
         saveGame();
         draw();
     }
+};
 
+document.getElementById("save-button").onclick = async () => {
+    const name = prompt("Enter a name for this save:");
+    
+    // This is for if the user clicks cancel on the prompt
+    if (name === null) {
+        return;
+    }
+
+    const saveName = name.trim() || "Untitled Save"
+
+    await createSaveState(saveName);
 };
 
 document.getElementById("menu-button").addEventListener("click", () => {
@@ -36,11 +48,46 @@ const mergeAnimationMs = 40;
 
 
 class Tile {
+    /**
+     * Creates a Tile object
+     * @param {number} value The tile's value
+     * @param {number} x The x coordinate (Top left is 0, 0)
+     * @param {number} y The y coordinate (Top left is 0, 0)
+     * @param {number} animating Whether the tile is currently doing an animation
+     */
     constructor(value, x, y, animating) {
         this.value = value;
         this.x = x;
         this.y = y;
         this.animating = animating;
+    }
+}
+
+class SaveState {
+    /**
+     * Constructs a game save object
+     * @param {number} id Unique ID
+     * @param {string} name The Game Save's name
+     * @param {Tile[][]} grid The current game grid to be saved.
+     */
+    constructor(id, name, grid) {
+        this.id = id;
+        this.name = name;
+
+        // Only takes the values
+        this.grid = grid.map(row => row.map(tile => tile.value));
+
+        // Gets the highest and total value from the grid
+        this.highestValue = 0;
+        this.totalValue = 0;
+        for (const row of this.grid) {
+            for (const value of row) {
+                this.totalValue += value;
+                if (value > this.highestValue) {
+                    this.highestValue = value;
+                }
+            }
+        }
     }
 }
 
@@ -88,6 +135,7 @@ let animationController = {
 }
 
 let gameOver = false;
+loadSaveStateList();
 resetGame();
 
 
@@ -107,8 +155,130 @@ chrome.storage.local.get(
     }
 );
 
+/**
+ * Gets the stored save states.
+ * @returns {Promise<SaveState[]>} The current save states. Will be [] if none exist.
+ */
+async function getSaveStates() {
+    const result = await chrome.storage.local.get(["game2048_saveStates"]);
+
+    return result.game2048_saveStates || [];
+}
+
+async function createSaveState(name = "Untitled Save") {
+    const saves = await getSaveStates();
+
+    // The user shouldn't see the id, so just using the date should be fine. Makes ids unique
+    const newSave = new SaveState(Date.now().toString(), name, grid);
+
+    saves.push(newSave);
+
+    await chrome.storage.local.set({
+        game2048_saveStates: saves
+    });
+
+    await loadSaveStateList();
+}
+
+async function loadSaveState(id) {
+    const saves = await getSaveStates();
+
+    const save = saves.find(save => save.id === id);
+
+    if (!save) {
+        console.error("Save not found:", id);
+        return false;
+    }
+
+    finishAnimation();
+    grid = save.grid.map((row, y) =>
+        row.map((value, x) => {
+            if (value != 0) {
+                animationController.spawnAnimations.push(new SpawnAnimation(value, x, y));
+            }
+            return new Tile(value, x, y, true);
+        })    
+    );
+
+    gameOver = false; // TODO change this to instead calculate whether the game is over. Or store it.
+
+    // We are deliberately not going to save the game, since the player might not actually want to 
+
+    beginAnimation();
+
+    return true;
+}
+
+async function deleteSaveState(id) {
+    const saves = await getSaveStates();
+
+    const newSaves = saves.filter(save => save.id !== id);
+
+    await chrome.storage.local.set({
+        game2048_saveStates: newSaves
+    });
+}
+
+async function loadSaveStateList() {
+    const saveList = document.getElementById("save-list");
+
+    // Remove the old list
+    saveList.innerHTML = "";
+
+    const saves = await getSaveStates();
+
+    if (saves.length === 0) {
+        saveList.textContent = "No saved games.";
+        return;
+    }
+
+    for (const save of saves) {
+        createSaveElement(save, saveList);
+    }
+}
+
+/**
+ * Creates an entry for a given save state in the save list.
+ * @param {SaveState} save 
+ * @param {HTMLElement} saveList 
+ */
+function createSaveElement(save, saveList) {
+
+    const saveElement = document.createElement("div");
+
+    const name = document.createElement("strong");
+    name.textContent = save.name;
+
+    const totalValue = document.createElement("span");
+    totalValue.textContent = `Total: ${save.totalValue}`;
+
+    const loadButton = document.createElement("button");
+    loadButton.textContent = "Load";
+    loadButton.addEventListener("click", async () => {
+        await loadSaveState(save.id);
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", async () => {
+        await deleteSaveState(save.id);
+        await loadSaveStateList(); // Reload the save list without the deleted save
+    });
+
+    saveElement.appendChild(name);
+    saveElement.appendChild(document.createElement("br"));
+
+    saveElement.appendChild(totalValue);
+    saveElement.appendChild(document.createElement("br"));
+
+    saveElement.appendChild(loadButton);
+    saveElement.appendChild(deleteButton);
+
+    saveList.appendChild(saveElement);
+}
+
 function deepCopyGrid(copiedGrid = grid) {
-    return grid.map(row => [...row]);
+    return copiedGrid.map(row => [...row]);
 }
 
 
