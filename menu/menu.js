@@ -12,6 +12,13 @@ document.getElementById("snake-button").addEventListener("click", () => {
     window.location.href = "../snake/snake.html";
 });
 
+document.getElementById("minesweeper-button").addEventListener("click", () => {
+    chrome.storage.local.set({
+        active_window: "minesweeper"
+    });
+    window.location.href = "../minesweeper/minesweeper.html";
+});
+
 // Redirects to the window that was open last
 chrome.storage.local.get(
     ["active_window"],
@@ -21,6 +28,8 @@ chrome.storage.local.get(
             window.location.href = "../2048/2048.html";
         } else if (result.active_window == "snake") {
             window.location.href = "../snake/snake.html";
+        } else if (result.active_window == "minesweeper") {
+            window.location.href = "../minesweeper/minesweeper.html";
         }
 
     }
