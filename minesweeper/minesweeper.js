@@ -106,8 +106,101 @@ function coordsInBounds(x, y) {
 }
 
 
+
+function draw() { 
+
+    function drawBackground() {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    /**
+     * Wrapper function for drawTile using coordinates on the grid rather than canvas,
+     * and automatically getting the tile colour scheme.
+     * I.e. top left tile is (0,0), right of that is (1,0)) bottom right on a 4x4 board is (3,3)
+     * This can be used for animations using fractions. 
+     * E.g. Halfway through a move from (0,1) to (0,0) would be (0,0.5)
+     */
+    function drawTileAtGridCoordinates(value, tileX, tileY, scale = 1) {
+        drawTile(value, tileX * tileWidth, tileY * tileWidth, scale);
+    }
+
+
+    function drawTile(text, topLeftX, topLeftY, scale = 1) {
+        // Draws the tile background
+
+        const centreX = topLeftX + tileWidth / 2;
+        const centreY = topLeftY + tileHeight / 2;
+
+        ctx.save();
+
+        ctx.translate(centreX, centreY);
+        ctx.scale(scale * 0.9, scale * 0.9); // 1.0 scale doesn't look very good with animations
+
+        ctx.fillStyle = "grey";
+        ctx.fillRect(-tileWidth / 2, - tileHeight / 2, tileWidth, tileHeight);
+
+        // Draws a border around the tile
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-tileWidth / 2, - tileHeight / 2, tileWidth, tileHeight);
+
+        // Draws the text
+        ctx.fillStyle = "black"
+        ctx.textAlign = "center"; // Horizontally center
+        ctx.textBaseline = 'middle'; // Vertically center
+        const fontSize = getFontSize(text);
+        ctx.font = `${fontSize}px Arial`;
+        ctx.fillText(text, 0, 0);
+
+        ctx.restore();
+    }
+
+    function getFontSize(text) {
+
+        // Maximum. Math.min is to handle anything weird with non-square tiles
+        let fontSize = Math.min(tileHeight, tileWidth) * 0.4;
+
+        while (fontSize > 5) {
+
+            ctx.font = `${fontSize}px Arial`;
+
+            const width = ctx.measureText(text).width;
+
+            if (width <= tileWidth * 0.8) {
+                return fontSize;
+            }
+
+            fontSize--;
+        }
+
+        return 5; // Minimum
+    }
+
+    function drawTiles() {
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < columns; x++) {
+                let tile = grid[y][x]
+                let text = "";
+                if (tile.state == TileState.FLAGGED) {
+                    text = "F";
+                } else if (tile.state == TileState.REVEALED) {
+                    text = tile.isMine ? "M" : tile.surroundingMines;
+                }
+                drawTileAtGridCoordinates(text, x, y);
+            }
+        }
+    }
+
+    drawBackground();
+    drawTiles();
+    
+}
+
+
 function resetGame() {
     createGrid();
+    draw();
 }
 
 function printGrid() {
