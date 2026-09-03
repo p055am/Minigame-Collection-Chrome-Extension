@@ -12,6 +12,10 @@ document.getElementById("menu-button").addEventListener("click", () => {
     window.location.href = "../menu/menu.html";
 });
 
+canvas.addEventListener("mousedown", handleMouseDown);
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+
 // Settings for the game
 const rows = 8;
 const columns = 8;
@@ -81,18 +85,9 @@ function createGrid() {
 function countSurroundingMines(x, y) {
     let surroundingMines = 0;
 
-    let adjacentCoordinates = [
-        [x - 1, y - 1], [x, y - 1], [x + 1, y - 1],
-        [x - 1, y], [x + 1, y],
-        [x - 1, y + 1], [x, y + 1], [x + 1, y + 1],
-    ]
+    const surroundingTileCoordinates = getSurroundingTileCoords(x, y);
 
-    // Filter out of bounds coordinates
-    adjacentCoordinates = adjacentCoordinates.filter(([xCoord, yCoord]) =>
-        coordsInBounds(xCoord, yCoord)
-    );
-
-    for (const [xCoord, yCoord] of adjacentCoordinates) {
+    for (const [xCoord, yCoord] of surroundingTileCoordinates) {
         if (grid[yCoord][xCoord].isMine) {
             surroundingMines++;
         }
@@ -101,13 +96,79 @@ function countSurroundingMines(x, y) {
     return surroundingMines;
 }
 
+/**
+ * Gets the coordinates of all in-bounds tiles surrounding the given tile
+ * @param {number} x The center tile's x coordinate
+ * @param {number} y The center tile's y coordinate
+ * @returns {[[number, number]]} An array containing [x, y] coordinates of
+ *                               all valid surrounding tiles
+ */
+function getSurroundingTileCoords(x, y) {
+    let adjacentCoordinates = [
+        [x - 1, y - 1], [x, y - 1], [x + 1, y - 1],
+        [x - 1, y], [x + 1, y],
+        [x - 1, y + 1], [x, y + 1], [x + 1, y + 1],
+    ]
+
+    // Filter out of bounds coordinates
+    return adjacentCoordinates.filter(([xCoord, yCoord]) =>
+        coordsInBounds(xCoord, yCoord)
+    );
+}
+
 function coordsInBounds(x, y) {
     return x >= 0 && x < columns && y >= 0 && y < rows;
 }
 
 
+function handleMouseDown(event) {
+    const [tileX, tileY] = getTileCoordinates(event);
+    if (!coordsInBounds(tileX, tileY)) {
+        return;
+    }
+    const tile = grid[tileY][tileX];
 
-function draw() { 
+    if (event.button === 0) {
+        // Left Click
+        if (tile.state == TileState.HIDDEN) {
+            tile.state = TileState.REVEALED;
+        }
+    }
+
+    if (event.button === 2) {
+        // Right Click
+        if (tile.state == TileState.HIDDEN) {
+            tile.state = TileState.FLAGGED;
+        } else if (tile.state == TileState.FLAGGED) {
+            tile.state = TileState.HIDDEN;
+        }
+    }
+
+
+    draw();
+}
+
+
+/**
+ * Gets which tile the mouse is over during a mouse event
+ * @param {MouseEvent} event A mouse event
+ * @returns {[number, number]} The x and y coordinates of the clicked tile
+ */
+function getTileCoordinates(event) {
+    const rect = canvas.getBoundingClientRect();
+
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    const tileX = Math.floor(mouseX / tileWidth);
+    const tileY = Math.floor(mouseY / tileHeight);
+
+    return [tileX, tileY];
+}
+
+
+
+function draw() {
 
     function drawBackground() {
         ctx.fillStyle = "white";
@@ -194,7 +255,7 @@ function draw() {
 
     drawBackground();
     drawTiles();
-    
+
 }
 
 
