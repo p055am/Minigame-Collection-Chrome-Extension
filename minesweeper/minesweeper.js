@@ -1,4 +1,5 @@
 const canvas = document.getElementById("game");
+const statusMessage = document.getElementById("status-message");
 const ctx = canvas.getContext("2d");
 
 document.getElementById("reset-button").onclick = () => {
@@ -15,21 +16,17 @@ document.getElementById("menu-button").addEventListener("click", () => {
 canvas.addEventListener("mousedown", handleMouseDown);
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-
-// Settings for the game
-const rows = 8;
-const columns = 8;
-const mineRatio = 0.2;
-const totalMines = rows * columns * mineRatio;
-
-const tileHeight = canvas.height / rows;
-const tileWidth = canvas.width / columns;
-
 const TileState = {
     HIDDEN: 0,
     REVEALED: 1,
     FLAGGED: 2,
     QUESTION: 3
+};
+
+const GameState = {
+    PLAYING: 0,
+    VICTORY: 1,
+    DEFEAT: 2
 };
 
 class Tile {
@@ -50,9 +47,20 @@ class Tile {
     }
 }
 
-// Grid is initialised with 0s, gameOver is initially false
+// Settings for the game
+const rows = 8;
+const columns = 8;
+const mineRatio = 0.2;
+const totalMines = Math.ceil(rows * columns * mineRatio);
+
+const tileHeight = canvas.height / rows;
+const tileWidth = canvas.width / columns;
+
+// Initialise stuff for javascript typing. This will be reset again by resetGame
 let grid = [[new Tile(0, TileState.HIDDEN, 0, 0, false)]];
-let gameOver = false;
+let minesRemaining = totalMines;
+let nonMinesRemaining = rows * columns - totalMines;
+let gameState = GameState.PLAYING;
 
 resetGame();
 
@@ -124,6 +132,10 @@ function coordsInBounds(x, y) {
 
 
 function handleMouseDown(event) {
+    if (gameState != GameState.PLAYING) {
+        return;
+    }
+
     const [tileX, tileY] = getTileCoordinates(event);
     if (!coordsInBounds(tileX, tileY)) {
         return;
@@ -144,8 +156,10 @@ function handleMouseDown(event) {
         // Right Click
         if (tile.state == TileState.HIDDEN) {
             tile.state = TileState.FLAGGED;
+            minesRemaining--;
         } else if (tile.state == TileState.FLAGGED) {
             tile.state = TileState.QUESTION;
+            minesRemaining++;
         } else if (tile.state == TileState.QUESTION) {
             tile.state = TileState.HIDDEN;
         }
@@ -168,8 +182,10 @@ function revealTile(tile) {
     tile.state = TileState.REVEALED;
 
     if (tile.isMine) {
-        gameOver = true;
+        gameState = GameState.DEFEAT;
         return;
+    } else {
+        nonMinesRemaining--;
     }
 
     // Automatically reveal all mines surrounding a zero
@@ -186,6 +202,11 @@ function revealTile(tile) {
             // time being called it will immediately exit so no infinite recursion
             revealTile(adjTile);
         }
+    }
+
+    if (nonMinesRemaining == 0) {
+        gameState = GameState.VICTORY;
+        // TODO flag all of the mines
     }
 }
 
@@ -323,6 +344,15 @@ function draw() {
         }
     }
 
+    if (gameState == GameState.PLAYING) {
+        statusMessage.textContent = `Mines Remaining: ${minesRemaining}`;
+    } else if (gameState == GameState.DEFEAT) {
+        statusMessage.textContent = `Failure...`;
+    } else if (gameState == GameState.VICTORY) {
+        statusMessage.textContent = `Victory!`;
+    }
+
+
     drawBackground();
     drawTiles();
 }
@@ -330,7 +360,9 @@ function draw() {
 
 function resetGame() {
     createGrid();
-    gameOver = false;
+    gameState = GameState.PLAYING;
+    minesRemaining = totalMines;
+    nonMinesRemaining = rows * columns - totalMines;
     draw();
 }
 
