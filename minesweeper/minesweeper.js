@@ -136,7 +136,7 @@ function handleMouseDown(event) {
         if (tile.state == TileState.HIDDEN || tile.state == TileState.QUESTION) {
             revealTile(tile);
         } else if (tile.state == TileState.REVEALED) {
-            // TODO reveal if all surrounding tiles are flagged.
+            chordTile(tile);
         }
     }
 
@@ -174,9 +174,9 @@ function revealTile(tile) {
 
     // Automatically reveal all mines surrounding a zero
     if (tile.surroundingMines == 0) {
-        const surroundingTiles = getSurroundingTileCoords(tile.x, tile.y);
+        const surroundingTileCoords = getSurroundingTileCoords(tile.x, tile.y);
 
-        for (const [x, y] of surroundingTiles) {
+        for (const [x, y] of surroundingTileCoords) {
             const adjTile = grid[y][x];
             // Flagging gets overwritten by guarranteed safety
             if (adjTile.state == TileState.FLAGGED) {
@@ -185,6 +185,34 @@ function revealTile(tile) {
             // This can be called multiple times on the same tile, but after the first
             // time being called it will immediately exit so no infinite recursion
             revealTile(adjTile);
+        }
+    }
+}
+
+/**
+ * If the given tile is revealed and surrounding by the same number
+ * of flags as mines around it, attempt to reveal all surrounding tiles.
+ * @param {Tile} tile The tile being chorded
+ */
+function chordTile(tile) {
+    // Chording can only be done on revealed tiles
+    if (tile.state != TileState.REVEALED) {
+        return;
+    }
+
+    const surroundingTileCoords = getSurroundingTileCoords(tile.x, tile.y);
+
+    let surroundingFlags = 0;
+    for (const [x, y] of surroundingTileCoords) {
+        if (grid[y][x].state == TileState.FLAGGED) {
+            surroundingFlags++;
+        }
+    }
+
+    if (surroundingFlags == tile.surroundingMines) {
+        for (const [x, y] of surroundingTileCoords) {
+            // The flags will just get ignored
+            revealTile(grid[y][x]);
         }
     }
 }
