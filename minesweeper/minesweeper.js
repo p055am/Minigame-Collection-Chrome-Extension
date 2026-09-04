@@ -28,7 +28,8 @@ const tileWidth = canvas.width / columns;
 const TileState = {
     HIDDEN: 0,
     REVEALED: 1,
-    FLAGGED: 2
+    FLAGGED: 2,
+    QUESTION: 3
 };
 
 class Tile {
@@ -130,7 +131,7 @@ function handleMouseDown(event) {
 
     if (event.button === 0) {
         // Left Click
-        if (tile.state == TileState.HIDDEN) {
+        if (tile.state == TileState.HIDDEN || tile.state == TileState.QUESTION) {
             tile.state = TileState.REVEALED;
         }
     }
@@ -140,6 +141,8 @@ function handleMouseDown(event) {
         if (tile.state == TileState.HIDDEN) {
             tile.state = TileState.FLAGGED;
         } else if (tile.state == TileState.FLAGGED) {
+            tile.state = TileState.QUESTION;
+        } else if (tile.state == TileState.QUESTION) {
             tile.state = TileState.HIDDEN;
         }
     }
@@ -245,6 +248,8 @@ function draw() {
                 let text = "";
                 if (tile.state == TileState.FLAGGED) {
                     text = "F";
+                } else if (tile.state == TileState.QUESTION) {
+                    text = "?";
                 } else if (tile.state == TileState.REVEALED) {
                     text = tile.isMine ? "M" : tile.surroundingMines;
                 }
