@@ -52,6 +52,7 @@ class Tile {
 
 // Grid is initialised with 0s, gameOver is initially false
 let grid = [[new Tile(0, TileState.HIDDEN, 0, 0, false)]];
+let gameOver = false;
 
 resetGame();
 
@@ -127,12 +128,15 @@ function handleMouseDown(event) {
     if (!coordsInBounds(tileX, tileY)) {
         return;
     }
+
     const tile = grid[tileY][tileX];
 
     if (event.button === 0) {
         // Left Click
         if (tile.state == TileState.HIDDEN || tile.state == TileState.QUESTION) {
-            tile.state = TileState.REVEALED;
+            revealTile(tile);
+        } else if (tile.state == TileState.REVEALED) {
+            // TODO reveal if all surrounding tiles are flagged.
         }
     }
 
@@ -151,6 +155,39 @@ function handleMouseDown(event) {
     draw();
 }
 
+/**
+ * Reveals a tile, recursing to surrounding tiles if the tile is a zero.
+ * Will not do anything to Flagged or already revealed tiles.
+ * @param {Tile} tile The tile being revealed
+ */
+function revealTile(tile) {
+    if (tile.state == TileState.FLAGGED || tile.state == TileState.REVEALED) {
+        return;
+    }
+
+    tile.state = TileState.REVEALED;
+
+    if (tile.isMine) {
+        gameOver = true;
+        return;
+    }
+
+    // Automatically reveal all mines surrounding a zero
+    if (tile.surroundingMines == 0) {
+        const surroundingTiles = getSurroundingTileCoords(tile.x, tile.y);
+
+        for (const [x, y] of surroundingTiles) {
+            const adjTile = grid[y][x];
+            // Flagging gets overwritten by guarranteed safety
+            if (adjTile.state == TileState.FLAGGED) {
+                adjTile.state = TileState.HIDDEN;
+            }
+            // This can be called multiple times on the same tile, but after the first
+            // time being called it will immediately exit so no infinite recursion
+            revealTile(adjTile);
+        }
+    }
+}
 
 /**
  * Gets which tile the mouse is over during a mouse event
@@ -260,12 +297,12 @@ function draw() {
 
     drawBackground();
     drawTiles();
-
 }
 
 
 function resetGame() {
     createGrid();
+    gameOver = false;
     draw();
 }
 
