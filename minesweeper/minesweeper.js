@@ -81,7 +81,7 @@ class Game {
 }
 
 
-let game = new Game(8, 8, 0.3, FirstTileMethod.ZERO);
+let game = new Game(8, 8, 0.2, FirstTileMethod.ZERO);
 
 resetGame();
 
@@ -296,7 +296,15 @@ function revealTile(tile) {
 
     if (game.nonMinesRemaining == 0) {
         game.gameState = GameState.VICTORY;
-        // TODO flag all of the mines
+        
+        // Flag all mines
+        for (const row of game.grid) {
+            for (const tile of row) {
+                if (tile.isMine) {
+                    tile.state = TileState.FLAGGED;
+                }
+            }
+        }
     }
 }
 
