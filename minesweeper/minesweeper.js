@@ -273,6 +273,14 @@ function revealTile(tile) {
 
     if (tile.isMine) {
         game.gameState = GameState.DEFEAT;
+        // Reveal all mines
+        for (const row of game.grid) {
+            for (const tile of row) {
+                if (tile.isMine) {
+                    tile.state = TileState.REVEALED;
+                }
+            }
+        }
         return;
     } else {
         game.nonMinesRemaining--;
