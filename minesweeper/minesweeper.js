@@ -26,7 +26,14 @@ const TileState = {
 const GameState = {
     PLAYING: 0,
     VICTORY: 1,
-    DEFEAT: 2
+    DEFEAT: 2,
+    NEW_GAME: 3
+};
+
+const FirstTileMethod = {
+    RANDOM: 0,
+    SAFE: 1,
+    ZERO: 2
 };
 
 class Tile {
@@ -53,11 +60,13 @@ class Game {
      * @param {number} rows The rows in the grid
      * @param {number} columns The columns in the grid
      * @param {number} mineRatio The proportion of tiles that are mines. Should be between 0 and 1
+     * @param {FirstTileMethod} firstTileMethod The way the first tile is spawned
      */
-    constructor(rows, columns, mineRatio) {
+    constructor(rows, columns, mineRatio, firstTileMethod) {
         this.rows = rows;
         this.columns = columns;
         this.mineRatio = mineRatio;
+        this.firstTileMethod = firstTileMethod;
         
         this.totalMines = Math.ceil(rows * columns * mineRatio);
         this.tileHeight = canvas.height / rows;
@@ -72,7 +81,7 @@ class Game {
 }
 
 
-let game = new Game(8, 8, 0.2);
+let game = new Game(8, 8, 0.3, FirstTileMethod.ZERO);
 
 resetGame();
 
@@ -97,24 +106,66 @@ function saveGame() {
     });
 }
 
-function createGrid() {
-    // Initialise the grid with all non-mines
+/**
+ * Initialise the grid with all hidden, non-mines
+ */
+function createEmptyGrid() {
     game.grid = Array.from({ length: game.rows }, (_, y) =>
         Array.from({ length: game.columns }, (_, x) =>
             new Tile(0, TileState.HIDDEN, x, y, false)
         )
     );
+}
+
+/**
+ * Creates the grid, considering the first tile depending on game.firstTileMethod
+ * @param {number} firstTileX The first tile generated X coordinate
+ * @param {number} firstTileY The first generated Y coordinate
+ */
+function createGrid(firstTileX = -100, firstTileY = -100) {
+    // Initialise the grid with all non-mines
+    createEmptyGrid();
 
     // Populate tiles with mines
     // TODO make this more efficient, maybe add some error checking.
     let mines = 0;
     while (mines < game.totalMines) {
-        let newMineRow = Math.floor(Math.random() * game.rows);
-        let newMineColumn = Math.floor(Math.random() * game.columns);
-        if (!game.grid[newMineRow][newMineColumn].isMine) {
-            game.grid[newMineRow][newMineColumn].isMine = true;
-            mines++;
+        let newMineY = Math.floor(Math.random() * game.rows);
+        let newMineX = Math.floor(Math.random() * game.columns);
+        if (game.grid[newMineY][newMineX].isMine) {
+            continue;
         }
+
+        // On safe and zero modes, try again if mine is put into the first tile
+        if (game.firstTileMethod == FirstTileMethod.SAFE ||
+                game.firstTileMethod == FirstTileMethod.ZERO) {
+            if (firstTileX == newMineX && firstTileY == newMineY) {
+                continue;
+            }
+        }
+
+        // On zero mode, also try again if mine is put into surrounding tiles
+        if (game.firstTileMethod == FirstTileMethod.ZERO) {
+            // This method is probably more inefficient than just checking if 
+            // firstTileX - 1 <= newMineX <= firstTileX + 1 etc. but it'll be useful
+            // if I add different surrounding tile criteria.
+            const surroundingTileCoords = getSurroundingTileCoords(firstTileX, firstTileY);
+            let invalidSpawn = false;
+            for (const [x, y] of surroundingTileCoords) {
+                if (newMineX == x && newMineY == y) {
+                    invalidSpawn = true;
+                    break;
+                }
+            }
+            if (invalidSpawn) {
+                continue;
+            }
+        }
+
+        
+
+        game.grid[newMineY][newMineX].isMine = true;
+        mines++;
     }
 
     // Count Surrounding Mines for each tile
@@ -165,13 +216,19 @@ function coordsInBounds(x, y) {
 
 
 function handleMouseDown(event) {
-    if (game.gameState != GameState.PLAYING) {
+    if (game.gameState != GameState.PLAYING && game.gameState != GameState.NEW_GAME) {
         return;
     }
 
     const [tileX, tileY] = getTileCoordinates(event);
     if (!coordsInBounds(tileX, tileY)) {
         return;
+    }
+
+    if (game.gameState == GameState.NEW_GAME) {
+        // Grid is created on first click to avoid first tile being a mine
+        createGrid(tileX, tileY);
+        game.gameState = GameState.PLAYING;
     }
 
     const tile = game.grid[tileY][tileX];
@@ -385,6 +442,8 @@ function draw() {
         statusMessage.textContent = `Failure...`;
     } else if (game.gameState == GameState.VICTORY) {
         statusMessage.textContent = `Victory!`;
+    } else if (game.gameState == GameState.NEW_GAME) {
+        statusMessage.textContent = `Click a tile! Mines: ${game.totalMines}`;
     }
 
 
@@ -394,8 +453,8 @@ function draw() {
 
 
 function resetGame() {
-    createGrid();
-    game.gameState = GameState.PLAYING;
+    createEmptyGrid();
+    game.gameState = GameState.NEW_GAME;
     game.minesRemaining = game.totalMines;
     game.nonMinesRemaining = game.rows * game.columns - game.totalMines;
     draw();
