@@ -371,12 +371,12 @@ function draw() {
      * This can be used for animations using fractions. 
      * E.g. Halfway through a move from (0,1) to (0,0) would be (0,0.5)
      */
-    function drawTileAtGridCoordinates(value, tileX, tileY, scale = 1) {
-        drawTile(value, tileX * tileWidth, tileY * tileWidth, scale);
+    function drawTileAtGridCoordinates(value, background, tileX, tileY, scale = 1) {
+        drawTile(value, background, tileX * tileWidth, tileY * tileWidth, scale);
     }
 
 
-    function drawTile(text, topLeftX, topLeftY, scale = 1) {
+    function drawTile(text, background, topLeftX, topLeftY, scale = 1) {
         // Draws the tile background
 
         const centreX = topLeftX + tileWidth / 2;
@@ -385,9 +385,9 @@ function draw() {
         ctx.save();
 
         ctx.translate(centreX, centreY);
-        ctx.scale(scale * 0.9, scale * 0.9); // 1.0 scale doesn't look very good with animations
+        ctx.scale(scale * 0.9, scale * 0.9);
 
-        ctx.fillStyle = "grey";
+        ctx.fillStyle = background;
         ctx.fillRect(-tileWidth / 2, - tileHeight / 2, tileWidth, tileHeight);
 
         // Draws a border around the tile
@@ -432,14 +432,24 @@ function draw() {
             for (let x = 0; x < game.columns; x++) {
                 let tile = game.grid[y][x]
                 let text = "";
+                let background = "grey";
                 if (tile.state == TileState.FLAGGED) {
                     text = "F";
                 } else if (tile.state == TileState.QUESTION) {
-                    text = "?";
+                    text = "?"
                 } else if (tile.state == TileState.REVEALED) {
-                    text = tile.isMine ? "M" : tile.surroundingMines;
+                    if (tile.isMine) {
+                        text = "M";
+                        background = "red";
+                    } else if (tile.surroundingMines == 0) {
+                        text = "";
+                        background = "lightgrey";
+                    } else {
+                        text = tile.surroundingMines;
+                        background = "lightgrey";
+                    }
                 }
-                drawTileAtGridCoordinates(text, x, y);
+                drawTileAtGridCoordinates(text, background, x, y);
             }
         }
     }
