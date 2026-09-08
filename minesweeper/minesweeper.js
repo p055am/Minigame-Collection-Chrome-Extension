@@ -47,27 +47,60 @@ class Tile {
     }
 }
 
-// Settings for the game
-const rows = 8;
-const columns = 8;
-const mineRatio = 0.2;
-const totalMines = Math.ceil(rows * columns * mineRatio);
+class Game {
+    /**
+     * Creates a game object
+     * @param {number} rows The rows in the grid
+     * @param {number} columns The columns in the grid
+     * @param {number} mineRatio The proportion of tiles that are mines. Should be between 0 and 1
+     */
+    constructor(rows, columns, mineRatio) {
+        this.rows = rows;
+        this.columns = columns;
+        this.mineRatio = mineRatio;
+        
+        this.totalMines = Math.ceil(rows * columns * mineRatio);
+        this.tileHeight = canvas.height / rows;
+        this.tileWidth = canvas.height / columns;
 
-const tileHeight = canvas.height / rows;
-const tileWidth = canvas.width / columns;
+        // Initialise stuff for javascript typing. This will be reset by resetGame
+        this.grid = [[new Tile(0, TileState.HIDDEN, 0, 0, false)]];
+        this.minesRemaining = this.totalMines;
+        this.nonMinesRemaining = rows * columns - this.totalMines;
+        this.gameState = GameState.PLAYING;
+    }
+}
 
-// Initialise stuff for javascript typing. This will be reset again by resetGame
-let grid = [[new Tile(0, TileState.HIDDEN, 0, 0, false)]];
-let minesRemaining = totalMines;
-let nonMinesRemaining = rows * columns - totalMines;
-let gameState = GameState.PLAYING;
+
+let game = new Game(8, 8, 0.2);
 
 resetGame();
 
+chrome.storage.local.get(
+    ["minesweeper_game"],
+    (result) => {
+
+        if (result.minesweeper_game) {
+            game = result.minesweeper_game;
+            draw();
+        }
+        else {
+            resetGame();
+        }
+
+    }
+);
+
+function saveGame() {
+    chrome.storage.local.set({
+        minesweeper_game: game
+    });
+}
+
 function createGrid() {
     // Initialise the grid with all non-mines
-    grid = Array.from({ length: rows }, (_, y) =>
-        Array.from({ length: columns }, (_, x) =>
+    game.grid = Array.from({ length: game.rows }, (_, y) =>
+        Array.from({ length: game.columns }, (_, x) =>
             new Tile(0, TileState.HIDDEN, x, y, false)
         )
     );
@@ -75,19 +108,19 @@ function createGrid() {
     // Populate tiles with mines
     // TODO make this more efficient, maybe add some error checking.
     let mines = 0;
-    while (mines < totalMines) {
-        let newMineRow = Math.floor(Math.random() * rows);
-        let newMineColumn = Math.floor(Math.random() * columns);
-        if (!grid[newMineRow][newMineColumn].isMine) {
-            grid[newMineRow][newMineColumn].isMine = true;
+    while (mines < game.totalMines) {
+        let newMineRow = Math.floor(Math.random() * game.rows);
+        let newMineColumn = Math.floor(Math.random() * game.columns);
+        if (!game.grid[newMineRow][newMineColumn].isMine) {
+            game.grid[newMineRow][newMineColumn].isMine = true;
             mines++;
         }
     }
 
     // Count Surrounding Mines for each tile
-    for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < columns; x++) {
-            grid[y][x].surroundingMines = countSurroundingMines(x, y);
+    for (let y = 0; y < game.rows; y++) {
+        for (let x = 0; x < game.columns; x++) {
+            game.grid[y][x].surroundingMines = countSurroundingMines(x, y);
         }
     }
 }
@@ -98,7 +131,7 @@ function countSurroundingMines(x, y) {
     const surroundingTileCoordinates = getSurroundingTileCoords(x, y);
 
     for (const [xCoord, yCoord] of surroundingTileCoordinates) {
-        if (grid[yCoord][xCoord].isMine) {
+        if (game.grid[yCoord][xCoord].isMine) {
             surroundingMines++;
         }
     }
@@ -127,12 +160,12 @@ function getSurroundingTileCoords(x, y) {
 }
 
 function coordsInBounds(x, y) {
-    return x >= 0 && x < columns && y >= 0 && y < rows;
+    return x >= 0 && x < game.columns && y >= 0 && y < game.rows;
 }
 
 
 function handleMouseDown(event) {
-    if (gameState != GameState.PLAYING) {
+    if (game.gameState != GameState.PLAYING) {
         return;
     }
 
@@ -141,7 +174,7 @@ function handleMouseDown(event) {
         return;
     }
 
-    const tile = grid[tileY][tileX];
+    const tile = game.grid[tileY][tileX];
 
     if (event.button === 0) {
         // Left Click
@@ -156,16 +189,16 @@ function handleMouseDown(event) {
         // Right Click
         if (tile.state == TileState.HIDDEN) {
             tile.state = TileState.FLAGGED;
-            minesRemaining--;
+            game.minesRemaining--;
         } else if (tile.state == TileState.FLAGGED) {
             tile.state = TileState.QUESTION;
-            minesRemaining++;
+            game.minesRemaining++;
         } else if (tile.state == TileState.QUESTION) {
             tile.state = TileState.HIDDEN;
         }
     }
 
-
+    saveGame();
     draw();
 }
 
@@ -182,10 +215,10 @@ function revealTile(tile) {
     tile.state = TileState.REVEALED;
 
     if (tile.isMine) {
-        gameState = GameState.DEFEAT;
+        game.gameState = GameState.DEFEAT;
         return;
     } else {
-        nonMinesRemaining--;
+        game.nonMinesRemaining--;
     }
 
     // Automatically reveal all mines surrounding a zero
@@ -193,7 +226,7 @@ function revealTile(tile) {
         const surroundingTileCoords = getSurroundingTileCoords(tile.x, tile.y);
 
         for (const [x, y] of surroundingTileCoords) {
-            const adjTile = grid[y][x];
+            const adjTile = game.grid[y][x];
             // Flagging gets overwritten by guarranteed safety
             if (adjTile.state == TileState.FLAGGED) {
                 adjTile.state = TileState.HIDDEN;
@@ -204,8 +237,8 @@ function revealTile(tile) {
         }
     }
 
-    if (nonMinesRemaining == 0) {
-        gameState = GameState.VICTORY;
+    if (game.nonMinesRemaining == 0) {
+        game.gameState = GameState.VICTORY;
         // TODO flag all of the mines
     }
 }
@@ -225,7 +258,7 @@ function chordTile(tile) {
 
     let surroundingFlags = 0;
     for (const [x, y] of surroundingTileCoords) {
-        if (grid[y][x].state == TileState.FLAGGED) {
+        if (game.grid[y][x].state == TileState.FLAGGED) {
             surroundingFlags++;
         }
     }
@@ -233,7 +266,7 @@ function chordTile(tile) {
     if (surroundingFlags == tile.surroundingMines) {
         for (const [x, y] of surroundingTileCoords) {
             // The flags will just get ignored
-            revealTile(grid[y][x]);
+            revealTile(game.grid[y][x]);
         }
     }
 }
@@ -249,8 +282,8 @@ function getTileCoordinates(event) {
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    const tileX = Math.floor(mouseX / tileWidth);
-    const tileY = Math.floor(mouseY / tileHeight);
+    const tileX = Math.floor(mouseX / game.tileWidth);
+    const tileY = Math.floor(mouseY / game.tileHeight);
 
     return [tileX, tileY];
 }
@@ -258,6 +291,8 @@ function getTileCoordinates(event) {
 
 
 function draw() {
+    const tileWidth = game.tileWidth;
+    const tileHeight = game.tileHeight;
 
     function drawBackground() {
         ctx.fillStyle = "white";
@@ -328,9 +363,9 @@ function draw() {
     }
 
     function drawTiles() {
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < columns; x++) {
-                let tile = grid[y][x]
+        for (let y = 0; y < game.rows; y++) {
+            for (let x = 0; x < game.columns; x++) {
+                let tile = game.grid[y][x]
                 let text = "";
                 if (tile.state == TileState.FLAGGED) {
                     text = "F";
@@ -344,11 +379,11 @@ function draw() {
         }
     }
 
-    if (gameState == GameState.PLAYING) {
-        statusMessage.textContent = `Mines Remaining: ${minesRemaining}`;
-    } else if (gameState == GameState.DEFEAT) {
+    if (game.gameState == GameState.PLAYING) {
+        statusMessage.textContent = `Mines Remaining: ${game.minesRemaining}`;
+    } else if (game.gameState == GameState.DEFEAT) {
         statusMessage.textContent = `Failure...`;
-    } else if (gameState == GameState.VICTORY) {
+    } else if (game.gameState == GameState.VICTORY) {
         statusMessage.textContent = `Victory!`;
     }
 
@@ -360,14 +395,14 @@ function draw() {
 
 function resetGame() {
     createGrid();
-    gameState = GameState.PLAYING;
-    minesRemaining = totalMines;
-    nonMinesRemaining = rows * columns - totalMines;
+    game.gameState = GameState.PLAYING;
+    game.minesRemaining = game.totalMines;
+    game.nonMinesRemaining = game.rows * game.columns - game.totalMines;
     draw();
 }
 
 function printGrid() {
     console.table(
-        grid.map(row => row.map(tile => tile.isMine ? "M" : tile.surroundingMines))
+        game.grid.map(row => row.map(tile => tile.isMine ? "M" : tile.surroundingMines))
     );
 }
